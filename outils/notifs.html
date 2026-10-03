@@ -62,7 +62,7 @@ async function main(){
   // Message reçu pendant que l'appli est ouverte : on l'affiche quand même.
   onMessage(messaging,async p=>{
     const n=p.notification||{};
-    try{const reg=await navigator.serviceWorker.ready;reg.showNotification(n.title||"Théâtre du Chariot",{body:n.body||"",icon:"icon-192.png",data:{FCM_MSG:{notification:{click_action:"./"}}}})}
+    try{const reg=await navigator.serviceWorker.ready;reg.showNotification(n.title||"Théâtre du Chariot",{body:n.body||"",icon:"icon-192.png",badge:"badge-96.png",image:n.image||undefined,data:{FCM_MSG:{notification:{click_action:"./"}}}})}
     catch(e){say(n.title||"Nouveau message du Chariot")}
   });
 

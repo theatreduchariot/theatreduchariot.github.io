@@ -140,7 +140,7 @@ async function main() {
       const res = await fcm.sendEachForMulticast({
         tokens: batch,
         notification: { title: m.title, body: m.body },
-        webpush: { notification: { icon: APP + "icon-192.png" }, fcmOptions: { link: APP } }
+        webpush: { notification: { icon: APP + "icon-192.png", badge: APP + "badge-96.png" }, fcmOptions: { link: APP } }
       });
       res.responses.forEach((r, j) => {
         const c = r.error && r.error.code;

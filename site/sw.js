@@ -3,7 +3,26 @@
 // 2) Reçoit les notifications envoyées par l'équipe depuis Firebase (Cloud Messaging).
 // Stratégie « réseau d'abord » : on affiche toujours la version la plus récente,
 // et la dernière version enregistrée sert seulement quand il n'y a pas de connexion.
-const CACHE = "chariot-v1";
+const CACHE = "chariot-v2";
+
+// Affichage des notifications avec l'icône du Chariot (la roue sur fond rose), y compris pour
+// les messages écrits à la main dans la console Firebase, qui n'indiquent pas d'icône.
+// Ce gestionnaire passe avant celui de Firebase (déclaré plus bas) et l'empêche d'afficher un doublon.
+self.addEventListener("push", e => {
+  let p = null;
+  try { p = e.data && e.data.json(); } catch (err) { return; }
+  const n = p && p.notification;
+  if (!n) return; // message sans notification : laissé à Firebase
+  e.stopImmediatePropagation();
+  const link = (p.fcmOptions && p.fcmOptions.link) || n.click_action || "./";
+  e.waitUntil(self.registration.showNotification(n.title || "Théâtre du Chariot", {
+    body: n.body || "",
+    icon: "icon-192.png",
+    badge: "badge-96.png",
+    image: n.image || undefined,
+    data: { FCM_MSG: { notification: { click_action: link } } }
+  }));
+});
 
 try {
   importScripts(
