@@ -43,6 +43,12 @@ h3{font-family:var(--display);font-weight:700;font-size:17px;margin:0}
 .lede{color:var(--muted);margin:0 0 18px;max-width:60ch}
 .label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 
+.search{position:relative;margin:0 0 14px}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:20px;height:20px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;pointer-events:none}
+.search input{width:100%;font:500 16px var(--body);padding:13px 44px;border-radius:8px;border:2px solid var(--line);background:var(--surface);color:var(--ink);-webkit-appearance:none;appearance:none}
+.search input:focus{outline:none;border-color:var(--accent)}
+.search input::-webkit-search-cancel-button{display:none}
+.search button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:50%;background:var(--chip);color:var(--ink);font:700 20px/1 var(--body);cursor:pointer}
 .seg{display:flex;gap:4px;background:var(--chip);padding:4px;border-radius:8px;margin-bottom:18px}
 .seg button{flex:1;border:0;background:transparent;color:var(--ink);font:600 13px var(--body);padding:10px 6px;border-radius:6px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
@@ -334,7 +340,7 @@ function card(s){
   return `<button class="show" data-show="${s.id}">${poster(s)}<div><div class="when">${range(s)}${isFav(s.id)?' <span class="heart" aria-label="Favori">♥</span>':""}</div><h3>${esc(s.t)}</h3><div class="by">${esc(s.by)}</div><div class="chips">${todayChip(s)}${chips}</div></div></button>`;
 }
 
-let state={tab:"programme",seg:"affiche",calM:null,calD:null};
+let state={tab:"programme",seg:"affiche",calM:null,calD:null,q:""};
 let storeOK=true;
 let acct={name:"",last:"",favs:[],plans:[]};
 try{const a=JSON.parse(localStorage.getItem("chariot-compte")||"null");if(a)acct={name:a.name||"",last:a.last||"",favs:a.favs||[],plans:a.plans||[]}}catch(e){storeOK=false}
@@ -520,9 +526,36 @@ const views={
  }
 };
 
+// ---- Recherche de spectacles (saison + archives) ----
+const norm=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const hay=s=>" "+norm([s.t,s.by,s.genre,s.age,s.periode,s.d,...(s.credits||[]).flat(),...((PROFIL[s.id]||{}).th||[]).map(x=>THEMES[x]||x)].join(" ")).replace(/[^a-z0-9]+/g," ");
+function searchShows(q){
+  const words=norm(q).replace(/[^a-z0-9]+/g," ").split(" ").filter(Boolean);if(!words.length)return [];
+  const nextOf=s=>sesOf(s).filter(d=>d>=today).sort((a,b)=>a-b)[0];
+  return SHOWS.filter(s=>{const h=hay(s);return words.every(w=>h.includes(" "+w))})
+    .map((s,i)=>({s,i,n:nextOf(s),inT:words.every(w=>norm(s.t).includes(w))}))
+    .sort((a,b)=>(b.inT-a.inT)||((a.n?0:1)-(b.n?0:1))||((a.n&&b.n)?a.n-b.n:0)||a.i-b.i).map(x=>x.s);
+}
+function fillSearch(){
+  const box=document.getElementById("search-res"),body=document.getElementById("prog-body");if(!box||!body)return;
+  const q=(state.q||"").trim();
+  body.hidden=!!q; const clr=document.getElementById("q-clear"); if(clr)clr.hidden=!q;
+  if(!q){box.innerHTML="";return}
+  const r=searchShows(q);
+  box.innerHTML=r.length?`<p class="small" style="margin:0 0 10px">${r.length} spectacle${r.length>1?"s":""} trouvé${r.length>1?"s":""}</p><div class="list">${r.map(card).join("")}</div>`
+    :`<p class="small">Aucun spectacle ne correspond à « ${esc(q)} ». Essayez un titre, un nom d'artiste, une compagnie ou un thème (ex. « marionnette », « famille »).</p>`;
+}
+const _programme=views.programme;
+views.programme=function(){
+  const h=_programme(),i=h.indexOf("</p>")+4;
+  const bar=`<div class="search" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><label class="sr" for="q">Rechercher un spectacle</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher un spectacle, un artiste, un thème…" value="${esc(state.q||"")}"><button type="button" id="q-clear" aria-label="Effacer la recherche" ${state.q?"":"hidden"}>×</button></div><div id="search-res"></div>`;
+  return h.slice(0,i)+bar+`<div id="prog-body">`+h.slice(i)+`</div>`;
+};
+
 const view=document.getElementById("view"), sheet=document.getElementById("sheet");
 function render(){
   view.innerHTML=views[state.tab]();
+  if(state.tab==="programme")fillSearch();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.toggleAttribute("aria-current",false)||b.dataset.tab===state.tab&&b.setAttribute("aria-current","page"));
   try{localStorage.setItem("chariot-tab",state.tab)}catch(e){}
 }
@@ -572,6 +605,8 @@ document.addEventListener("submit",e=>{
   else if(f.id==="rename"){acct.name=v;acct.last=l;saveAcct();render();toast("Nom et prénom enregistrés")}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!sheet.hidden)closeShow()});
+document.addEventListener("input",e=>{if(e.target.id==="q"){state.q=e.target.value;fillSearch()}});
+document.addEventListener("click",e=>{if(e.target.id==="q-clear"){state.q="";const i=document.getElementById("q");if(i){i.value="";i.focus()}fillSearch()}});
 render();
 // Message d'accueil affiché à la première ouverture
 (function(){
