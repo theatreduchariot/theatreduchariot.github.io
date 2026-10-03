@@ -123,6 +123,7 @@ async function main() {
   const tokDocs = (await db.collection("tokens").get()).docs;
   const tokens = tokDocs.map(d => ({ id: d.id, ...d.data() })).filter(t => typeof t.token === "string" && t.token);
   const all = [...new Set(tokens.map(t => t.token))];
+  note(`Collection tokens : ${tokDocs.length} document(s) ; champs : ${tokDocs.map(d => Object.keys(d.data()).join(",") + (typeof d.get("token") === "string" ? " (token " + d.get("token").length + " car.)" : "")).join(" / ")}`);
 
   const now = parisNow();
   const { messages, state: next } = plan({ SHOWS, Y, state, tokens, now });
