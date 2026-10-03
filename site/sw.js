@@ -24,7 +24,7 @@ self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 // Toucher une notification ouvre l'appli (ou la remet au premier plan).
 self.addEventListener("notificationclick", e => {
   e.notification.close();
-  const link = (e.notification.data && e.notification.data.FCM_MSG && e.notification.data.FCM_MSG.notification && e.notification.data.FCM_MSG.notification.click_action) || "/";
+  const link = (e.notification.data && e.notification.data.FCM_MSG && e.notification.data.FCM_MSG.notification && e.notification.data.FCM_MSG.notification.click_action) || "./";
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
     for (const c of list) { if ("focus" in c) return c.focus(); }
     return self.clients.openWindow(link);

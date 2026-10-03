@@ -1,7 +1,7 @@
 {
  "name": "Théâtre du Chariot",
  "short_name": "Le Chariot",
- "start_url": "/",
+ "start_url": "./",
  "display": "standalone",
  "background_color": "#ffffff",
  "theme_color": "#ff00ff",
@@ -24,7 +24,7 @@
    "purpose": "maskable"
   }
  ],
- "id": "/",
- "scope": "/",
+ "id": "./",
+ "scope": "./",
  "description": "Programme, calendrier et billetterie du Théâtre du Chariot (Paris 11e)."
 }
