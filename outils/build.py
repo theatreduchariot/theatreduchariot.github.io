@@ -87,6 +87,10 @@ def main(src_path):
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
         '<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+        # Règles de base fournies par claude.ai autour de l'artefact, à reproduire ici :
+        # sans [hidden]{display:none}, les fenêtres (message d'accueil…) ne se ferment pas.
+        '<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}'
+        'html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}[hidden]{display:none!important}</style>\n'
         + head + "\n</head>\n<body>\n" + rest + "</body>\n</html>\n"
     )
     html = html.replace("body{background:var(--bg)", "body{margin:0;background:var(--bg)", 1)
