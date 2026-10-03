@@ -1,10 +1,11 @@
 # Mettre en ligne l'appli du Théâtre du Chariot
 
 > **Octobre 2026 : l'appli est maintenant hébergée sur GitHub Pages**, à l'adresse
-> https://rgo071028-collab.github.io/appli-chariot/ (statistiques : …/appli-chariot/admin.html).
+> https://theatreduchariot.github.io/ (statistiques : https://theatreduchariot.github.io/admin.html).
+> Dépôt GitHub : theatreduchariot/theatreduchariot.github.io (ce nom exact donne l'adresse sans sous-dossier).
 > Le forfait gratuit de Netlify ne permet qu'une vingtaine de mises en ligne par mois, trop peu pour la synchro horaire.
 > La mise en ligne est faite par `.github/workflows/pages.yml` à chaque mise à jour de la branche `main`.
-> Les étapes Netlify ci-dessous ne servent plus ; dans Firebase, le domaine autorisé est `rgo071028-collab.github.io`.
+> Les étapes Netlify ci-dessous ne servent plus ; dans Firebase, le domaine autorisé est `theatreduchariot.github.io`.
 
 
 Ce dossier contient :

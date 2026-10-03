@@ -8,7 +8,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
-export const APP = "https://rgo071028-collab.github.io/appli-chariot/";
+export const APP = "https://theatreduchariot.github.io/";
 const JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
