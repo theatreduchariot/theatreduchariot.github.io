@@ -67,7 +67,9 @@ async function main(){
   });
 
   if(Notification.permission==="granted"){subscribe().catch(e=>log("Échec : "+(e.code||"")+" "+e.message));return}
-  if(Notification.permission==="denied"||get())return;
+  log("Choix enregistré : "+get());
+  // On ne repropose pas si la personne a refusé ; si l'autorisation a été perdue, le bandeau revient.
+  if(Notification.permission==="denied"||(get()==="non"&&!DBG))return;
 
   // Proposition affichée après les fenêtres d'accueil et d'installation.
   const later=()=>new Promise(r=>{
