@@ -108,6 +108,7 @@ export function plan({ SHOWS, Y, state, tokens, now }) {
 }
 
 // ---------- envoi ----------
+const note = m => console.log("::notice::" + m);
 async function main() {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!key) { console.log("Clé FIREBASE_SERVICE_ACCOUNT absente : aucune notification envoyée."); return; }
@@ -128,7 +129,7 @@ async function main() {
   // Lancement manuel « test » : un message d'essai à tous les abonnés, en plus du reste.
   if (process.env.NOTIF_TEST === "true") messages.unshift({ to: "all", title: "Test du Chariot", body: "Les notifications automatiques fonctionnent. À bientôt au théâtre !" });
   if (!state) console.log("Premier passage : programme mémorisé, rien n'est annoncé.");
-  console.log(`${all.length} téléphone(s) abonné(s), ${messages.length} message(s) à envoyer.`);
+  note(`${all.length} téléphone(s) abonné(s), ${messages.length} message(s) à envoyer. test=${process.env.NOTIF_TEST}`);
 
   const dead = new Set();
   for (const m of messages) {
@@ -144,7 +145,8 @@ async function main() {
         const c = r.error && r.error.code;
         if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token" || c === "messaging/invalid-argument") dead.add(batch[j]);
       });
-      console.log(`« ${m.title} » : ${res.successCount} envoyé(s), ${res.failureCount} échec(s).`);
+      const errs = [...new Set(res.responses.filter(r => r.error).map(r => r.error.code + " " + r.error.message))].join(" | ");
+      note(`« ${m.title} » : ${res.successCount} envoyé(s), ${res.failureCount} échec(s). ${errs}`);
     }
   }
   // Téléphones désabonnés : on efface leur adresse de notification
