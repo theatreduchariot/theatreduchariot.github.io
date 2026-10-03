@@ -38,7 +38,10 @@ async function main(){
   async function subscribe(){
     const reg=await navigator.serviceWorker.register("sw.js");
     await navigator.serviceWorker.ready;
-    return getToken(messaging,{vapidKey:vapid,serviceWorkerRegistration:reg});
+    const t=await getToken(messaging,{vapidKey:vapid,serviceWorkerRegistration:reg});
+    // Transmis (anonymement) pour les notifications automatiques : voir outils/firebase-sync.html
+    if(t){window.chariotToken=t;if(window.chariotSync)window.chariotSync();}
+    return t;
   }
 
   // Message reçu pendant que l'appli est ouverte : on l'affiche quand même.

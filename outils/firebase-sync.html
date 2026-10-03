@@ -1,18 +1,26 @@
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,doc,setDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-// Envoi anonyme des favoris et des « J'y vais » vers Firestore (aucun nom n'est envoyé).
+// Envoi anonyme vers Firestore (aucun nom n'est envoyé) :
+//  - votes/{uid} : favoris et « J'y vais » (statistiques), seulement si « Mon espace » est créé ;
+//  - tokens/{uid} : adresse de notification du téléphone (si les notifications sont activées),
+//    avec les favoris et « J'y vais » pour les rappels personnels.
 const cfg=window.FIREBASE_CONFIG;
 if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
   try{
-    const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);
+    const app=getApps().length?getApp():initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);
     let uid=null,timer=null;
     const push=async()=>{
-      if(!uid||!window.chariotState)return;
-      const st=window.chariotState(),ref=doc(db,"votes",uid);
-      try{ if(st) await setDoc(ref,{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(ref); }
+      if(!uid)return;
+      const st=window.chariotState?window.chariotState():null;
+      try{ if(st) await setDoc(doc(db,"votes",uid),{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(doc(db,"votes",uid)); }
       catch(e){console.warn("Envoi impossible",e)}
+      const tk=window.chariotToken;
+      if(tk){
+        try{ await setDoc(doc(db,"tokens",uid),{token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}); }
+        catch(e){console.warn("Abonnement aux notifications non enregistré",e)}
+      }
     };
     window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
     onAuthStateChanged(auth,u=>{if(u){uid=u.uid;push()}});

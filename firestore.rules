@@ -25,6 +25,17 @@ service cloud.firestore {
       allow read: if isOwner() || isAdmin();
     }
 
+    // Un document par téléphone abonné aux notifications (anonyme) : adresse de notification,
+    // favoris et « J'y vais » pour les rappels. Lu seulement par l'envoi automatique (GitHub).
+    match /tokens/{uid} {
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['token', 'favs', 'plans', 'updatedAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() < 500
+        && request.resource.data.favs is list && request.resource.data.favs.size() <= 50
+        && request.resource.data.plans is list && request.resource.data.plans.size() <= 200;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Tout le reste est fermé.
     match /{document=**} {
       allow read, write: if false;

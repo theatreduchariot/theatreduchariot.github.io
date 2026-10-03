@@ -83,3 +83,28 @@ Toutes les heures, Claude compare le site du théâtre avec l'appli, met à jour
 ## RGPD
 
 Aucune donnée nominative n'est envoyée. Les chiffres sont anonymes : un identifiant technique aléatoire par téléphone, avec ses favoris et ses séances notées. L'appli l'indique au moment de la création de l'espace. Faites tout de même relire ce texte par la personne qui suit ces questions au théâtre.
+
+## Notifications automatiques
+
+Programme : `outils/notifier.mjs`, lancé par `.github/workflows/notifs.yml` (GitHub Actions, gratuit).
+
+- **À chaque mise à jour du programme** (synchro horaire) :
+  - nouveau spectacle → à tous les abonnés ;
+  - nouvelles dates → à tous les abonnés ;
+  - séance devenue complète → aux abonnés qui ont ce spectacle en favori.
+- **Chaque matin vers 10h** :
+  - rappel « Demain 16h : … » pour les séances marquées « J'y vais » ;
+  - le lundi, le récap des spectacles de la semaine, envoyé à tous.
+
+Chaque téléphone qui active les notifications enregistre anonymement, dans Firestore (collection `tokens`), son adresse de notification, ses favoris et ses « J'y vais ».
+Ce qui a déjà été annoncé est noté dans le document `etat/notifs`. Au premier passage, rien n'est envoyé : le programme est seulement mémorisé.
+
+Mise en route, une seule fois :
+
+1. Firebase → ⚙️ Paramètres du projet → **Comptes de service** → **Générer une nouvelle clé privée**. Un fichier .json est téléchargé.
+2. GitHub → dépôt → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+   - Nom : `FIREBASE_SERVICE_ACCOUNT`
+   - Valeur : tout le contenu du fichier .json.
+3. Firebase → Firestore → **Règles** : coller le contenu de `firestore.rules`, puis **Publier**.
+
+Les messages écrits à la main depuis Firebase → Messaging fonctionnent toujours.

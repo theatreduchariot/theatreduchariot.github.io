@@ -1,0 +1,29 @@
+# Notifications automatiques (voir outils/notifier.mjs).
+# - à chaque mise à jour du programme : nouveau spectacle, nouvelles dates, séance complète ;
+# - chaque matin vers 10h (heure de Paris) : rappels « demain » et, le lundi, le récap de la semaine.
+# Nécessite le secret FIREBASE_SERVICE_ACCOUNT (Settings > Secrets and variables > Actions).
+name: Notifications automatiques
+on:
+  push:
+    branches: [main]
+    paths: [site/shows.js]
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+concurrency:
+  group: notifs
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  notifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-package-lock firebase-admin@12
+      - run: node outils/notifier.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
