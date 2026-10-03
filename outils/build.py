@@ -9,7 +9,7 @@ Utilisation :  python3 outils/build.py chemin/vers/artefact.html
 - Les affiches du site Wix (champ img) sont activées (REMOTE_IMG = true).
 - Le texte de confidentialité est adapté : la version Netlify envoie les favoris
   et les « J'y vais » de façon anonyme (Firebase).
-- La proposition d'installation de l'appli (outils/install.html) est ajoutée.
+- La proposition d'installation (outils/install.html) et celle des notifications (outils/notifs.html) sont ajoutées.
 - site/firebase-config.js, site/admin.html, site/sw.js et site/posters/ ne sont jamais modifiés.
 """
 import pathlib
@@ -82,6 +82,12 @@ def main(src_path):
     firebase = (SITE.parent / "outils" / "firebase-sync.html").read_text(encoding="utf-8")
     k = rest.index("<script>\n")
     rest = rest[:k] + '<script src="firebase-config.js"></script>\n<script src="shows.js"></script>\n' + firebase + rest[k:]
+
+    # Notifications de l'équipe : proposition affichée sous l'en-tête
+    notifs = (SITE.parent / "outils" / "notifs.html").read_text(encoding="utf-8")
+    if "</header>" not in rest:
+        sys.exit("Erreur : en-tête introuvable pour les notifications.")
+    rest = rest.replace("</header>", "</header>\n" + notifs, 1)
 
     # Proposition d'installation (Android : bouton Installer ; iPhone : explications)
     install = (SITE.parent / "outils" / "install.html").read_text(encoding="utf-8")
