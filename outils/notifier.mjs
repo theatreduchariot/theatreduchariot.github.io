@@ -128,6 +128,16 @@ async function main() {
   const now = parisNow();
   const { messages, state: next } = plan({ SHOWS, Y, state, tokens, now });
   // Lancement manuel « test » : un message d'essai à tous les abonnés, en plus du reste.
+  // Lancement manuel « rappel » : envoie à chaque téléphone le rappel de sa prochaine séance « J'y vais »,
+  // tel qu'il le recevra la veille (pour voir à quoi il ressemble).
+  if (process.env.NOTIF_RAPPEL === "true") {
+    const byId = Object.fromEntries(SHOWS.map(s => [s.id, s]));
+    for (const t of tokens) {
+      const nx = (t.plans || []).map(k => k.split("|")).filter(([id, x]) => byId[id] && x && `${Y}-${x}` >= `${now.day} ${now.time}`).sort((a, b) => a[1].localeCompare(b[1]))[0];
+      note(`Rappel d'essai : ${nx ? nx.join(" ") : "aucune séance « J'y vais » à venir"} (${(t.plans || []).length} J'y vais)`);
+      if (nx) messages.push({ to: [t.token], title: `Demain ${nx[1].slice(6).replace(":", "h").replace(/h00$/, "h")} : ${byId[nx[0]].t}`, body: "À demain au Théâtre du Chariot, 77 rue de Montreuil (Paris 11e) !" });
+    }
+  }
   if (process.env.NOTIF_TEST === "true") messages.unshift({ to: "all", title: "Test du Chariot", body: "Les notifications automatiques fonctionnent. À bientôt au théâtre !" });
   if (!state) console.log("Premier passage : programme mémorisé, rien n'est annoncé.");
   note(`${all.length} téléphone(s) abonné(s), ${messages.length} message(s) à envoyer. test=${process.env.NOTIF_TEST}`);

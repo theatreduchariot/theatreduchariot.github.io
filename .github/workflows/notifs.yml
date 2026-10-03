@@ -15,6 +15,10 @@ on:
         description: "Envoyer aussi un message d'essai à tous les abonnés"
         type: boolean
         default: false
+      rappel:
+        description: "Envoyer à chacun le rappel « Demain… » de sa prochaine séance J'y vais (essai)"
+        type: boolean
+        default: false
 concurrency:
   group: notifs
   cancel-in-progress: false
@@ -33,3 +37,4 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           NOTIF_TEST: ${{ inputs.test }}
+          NOTIF_RAPPEL: ${{ inputs.rappel }}
