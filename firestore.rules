@@ -5,9 +5,9 @@ service cloud.firestore {
     // Un document par téléphone, identifié de façon anonyme.
     match /votes/{uid} {
       function isAdmin() {
-        // Remplacez par l'adresse Google de l'administrateur si besoin.
+        // Adresses Google autorisées à voir les statistiques (admin.html).
         return request.auth != null
-          && request.auth.token.email == 'lechariot.contact@gmail.com'
+          && request.auth.token.email in ['lechariot.contact@gmail.com', 'rgo071028@gmail.com']
           && request.auth.token.email_verified == true;
       }
       function isOwner() {
