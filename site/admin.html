@@ -37,6 +37,7 @@ details ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
 <div class="wrap">
   <div class="row"><div><div class="label">Théâtre du Chariot · admin</div><h1>Statistiques de l'appli</h1></div>
     <div class="row"><button class="btn ghost" id="refresh" hidden>Actualiser</button><button class="btn" id="login">Se connecter avec Google</button></div></div>
+  <p class="muted" id="who" hidden></p>
   <p class="muted" id="status">Connectez-vous avec le compte Google administrateur pour voir les chiffres.</p>
   <div id="out"></div>
 </div>
@@ -70,6 +71,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
   getRedirectResult(auth).catch(fail);
   $("login").onclick=()=>{
     if(auth.currentUser&&!auth.currentUser.isAnonymous){signOut(auth);return}
+    provider.setCustomParameters({prompt:"select_account"});
     $("status").textContent="Connexion en cours…";
     signInWithPopup(auth,provider).catch(e=>{
       // Sur téléphone, les fenêtres surgissantes sont souvent bloquées : on passe par une redirection.
@@ -82,6 +84,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
     const ok=u&&!u.isAnonymous;
     $("login").textContent=ok?"Se déconnecter":"Se connecter avec Google";
     $("refresh").hidden=!ok;
+    $("who").hidden=!ok; if(ok)$("who").textContent="Connecté avec : "+(u.email||"adresse inconnue");
     if(ok)load(); else {$("out").innerHTML="";$("status").textContent="Connectez-vous avec le compte Google administrateur pour voir les chiffres."}
   });
   async function load(){
@@ -114,7 +117,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
       <p class="muted">Chiffres anonymes. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
       $("status").textContent="Mis à jour le "+new Date().toLocaleString("fr-FR");
     }catch(e){
-      $("out").innerHTML=`<p class="err">Accès refusé ou erreur : ${esc(e.message)}. Vérifiez que vous êtes connecté avec l'adresse indiquée dans les règles Firestore.</p>`;
+      const em=(auth.currentUser&&auth.currentUser.email)||"?";$("out").innerHTML=e.code==="permission-denied"?`<p class="err">Accès refusé : l'adresse <b>${esc(em)}</b> n'est pas autorisée dans les règles Firestore. Déconnectez-vous et reconnectez-vous avec l'adresse administrateur, ou ajoutez cette adresse dans Firestore &gt; Règles (ligne request.auth.token.email), puis cliquez sur Publier.</p>`:`<p class="err">Erreur : ${esc(e.message)}</p>`;
       $("status").textContent="";
     }
   }
