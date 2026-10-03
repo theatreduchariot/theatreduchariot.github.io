@@ -44,7 +44,7 @@ details ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
 <script src="shows.js"></script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const $=id=>document.getElementById(id);
@@ -59,7 +59,24 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
   $("login").hidden=true;
 }else{
   const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);
-  $("login").onclick=()=>auth.currentUser&&!auth.currentUser.isAnonymous?signOut(auth):signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>{$("status").textContent="Connexion impossible : "+e.message});
+  const MSG={
+    "auth/unauthorized-domain":"Cette adresse n'est pas autorisée dans Firebase. Ajoutez « "+location.hostname+" » dans Authentication > Paramètres > Domaines autorisés, puis réessayez.",
+    "auth/operation-not-allowed":"La connexion Google n'est pas activée dans Firebase. Activez « Google » dans Authentication > Mode de connexion, puis réessayez.",
+    "auth/popup-closed-by-user":"La fenêtre de connexion a été fermée avant la fin. Réessayez.",
+    "auth/network-request-failed":"Pas de connexion internet ou Firebase injoignable. Réessayez dans un instant."
+  };
+  const fail=e=>{$("status").textContent=(MSG[e.code]||"Connexion impossible : "+e.message)+(e.code?" ("+e.code+")":"")};
+  const provider=new GoogleAuthProvider();
+  getRedirectResult(auth).catch(fail);
+  $("login").onclick=()=>{
+    if(auth.currentUser&&!auth.currentUser.isAnonymous){signOut(auth);return}
+    $("status").textContent="Connexion en cours…";
+    signInWithPopup(auth,provider).catch(e=>{
+      // Sur téléphone, les fenêtres surgissantes sont souvent bloquées : on passe par une redirection.
+      if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(e.code))signInWithRedirect(auth,provider).catch(fail);
+      else fail(e);
+    });
+  };
   $("refresh").onclick=()=>load();
   onAuthStateChanged(auth,u=>{
     const ok=u&&!u.isAnonymous;
