@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 8 * * *"
   workflow_dispatch:
+    inputs:
+      test:
+        description: "Envoyer aussi un message d'essai à tous les abonnés"
+        type: boolean
+        default: false
 concurrency:
   group: notifs
   cancel-in-progress: false
@@ -27,3 +32,4 @@ jobs:
       - run: node outils/notifier.mjs
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NOTIF_TEST: ${{ inputs.test }}

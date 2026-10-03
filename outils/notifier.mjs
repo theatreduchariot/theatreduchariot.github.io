@@ -125,6 +125,8 @@ async function main() {
 
   const now = parisNow();
   const { messages, state: next } = plan({ SHOWS, Y, state, tokens, now });
+  // Lancement manuel « test » : un message d'essai à tous les abonnés, en plus du reste.
+  if (process.env.NOTIF_TEST === "true") messages.unshift({ to: "all", title: "Test du Chariot", body: "Les notifications automatiques fonctionnent. À bientôt au théâtre !" });
   if (!state) console.log("Premier passage : programme mémorisé, rien n'est annoncé.");
   console.log(`${all.length} téléphone(s) abonné(s), ${messages.length} message(s) à envoyer.`);
 
