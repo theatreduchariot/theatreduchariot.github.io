@@ -186,7 +186,7 @@ nav.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1
 </div>
 <script type="module">
 import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getMessaging,getToken,onMessage,isSupported} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import {getMessaging,getToken,deleteToken,onMessage,isSupported} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $=id=>document.getElementById(id);
 const cfg=self.FIREBASE_CONFIG, vapid=self.FIREBASE_VAPID_KEY;
@@ -210,7 +210,15 @@ async function main(){
   async function subscribe(){
     const reg=await navigator.serviceWorker.register("sw.js");
     await navigator.serviceWorker.ready;
-    const t=await getToken(messaging,{vapidKey:vapid,serviceWorkerRegistration:reg});
+    const opts={vapidKey:vapid,serviceWorkerRegistration:reg};
+    // L'adresse de notification gardée par le téléphone peut devenir invalide sans qu'il le sache
+    // (Google répond alors « appareil désinscrit »). On la renouvelle donc régulièrement.
+    const RK="chariot-fcm",V=2,AGE=3*864e5,now=Date.now();
+    let last={};try{last=JSON.parse(localStorage.getItem(RK)||"{}")}catch(e){}
+    const refresh=last.v!==V||!last.t||now-last.t>AGE;
+    if(refresh){try{await getToken(messaging,opts);await deleteToken(messaging)}catch(e){console.warn(e)}}
+    const t=await getToken(messaging,opts);
+    if(t&&refresh){try{localStorage.setItem(RK,JSON.stringify({v:V,t:now}))}catch(e){}}
     // Transmis (anonymement) pour les notifications automatiques : voir outils/firebase-sync.html
     if(t){window.chariotToken=t;if(window.chariotSync)window.chariotSync();}
     return t;
