@@ -95,7 +95,7 @@ def main(src_path):
     html = (
         '<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
-        '<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n'
+        '<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n<link rel="icon" type="image/png" href="icon-192.png">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n'
         # Règles de base fournies par claude.ai autour de l'artefact, à reproduire ici :
         # sans [hidden]{display:none}, les fenêtres (message d'accueil…) ne se ferment pas.
