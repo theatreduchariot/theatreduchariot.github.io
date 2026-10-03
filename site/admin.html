@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Chariot · Statistiques</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Montserrat:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#ffffff;--surface:#fff;--ink:#000;--muted:#5c5c5c;--line:#e2e2e2;--accent:#ff00ff;--accent-ink:#000;--chip:#f2f2f2;
+  --display:"Poppins","Helvetica Neue",Arial,sans-serif;--body:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px 48px;display:grid;gap:18px}
+h1{font:800 32px/1.05 var(--display);margin:0}
+h2{font:700 18px var(--display);margin:0}
+.muted{color:var(--muted)}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:11px 18px;font:600 14px var(--body);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi b{display:block;font:800 30px var(--display);font-variant-numeric:tabular-nums}
+.label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:480px}
+th,td{text-align:left;padding:10px 8px;border-top:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;border-top:0}
+td.n{text-align:right;font-weight:600}th.n{text-align:right}
+.bar{height:6px;border-radius:3px;background:var(--accent);margin-top:6px}
+details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600}
+details ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.err{background:var(--chip);border-radius:12px;padding:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row"><div><div class="label">Théâtre du Chariot · admin</div><h1>Statistiques de l'appli</h1></div>
+    <div class="row"><button class="btn ghost" id="refresh" hidden>Actualiser</button><button class="btn" id="login">Se connecter avec Google</button></div></div>
+  <p class="muted" id="status">Connectez-vous avec le compte Google administrateur pour voir les chiffres.</p>
+  <div id="out"></div>
+</div>
+<script src="firebase-config.js"></script>
+<script src="shows.js"></script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const $=id=>document.getElementById(id);
+const esc=x=>String(x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MOIS=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
+const JOURS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+const label=x=>{const d=new Date(Y,+x.slice(0,2)-1,+x.slice(3,5),+x.slice(6,8),+x.slice(9,11));return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} à ${d.getHours()}h${d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""}`};
+
+const cfg=window.FIREBASE_CONFIG;
+if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
+  $("status").textContent="La configuration Firebase n'est pas encore collée dans firebase-config.js (voir le guide).";
+  $("login").hidden=true;
+}else{
+  const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);
+  $("login").onclick=()=>auth.currentUser&&!auth.currentUser.isAnonymous?signOut(auth):signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>{$("status").textContent="Connexion impossible : "+e.message});
+  $("refresh").onclick=()=>load();
+  onAuthStateChanged(auth,u=>{
+    const ok=u&&!u.isAnonymous;
+    $("login").textContent=ok?"Se déconnecter":"Se connecter avec Google";
+    $("refresh").hidden=!ok;
+    if(ok)load(); else {$("out").innerHTML="";$("status").textContent="Connectez-vous avec le compte Google administrateur pour voir les chiffres."}
+  });
+  async function load(){
+    $("status").textContent="Chargement…";
+    try{
+      const snap=await getDocs(collection(db,"votes"));
+      const stats={};SHOWS.forEach(s=>stats[s.id]={favs:0,go:new Set(),ses:{}});
+      let people=0,active=0;
+      snap.forEach(d=>{
+        const v=d.data();people++;
+        if((v.favs||[]).length||(v.plans||[]).length)active++;
+        (v.favs||[]).forEach(id=>{if(stats[id])stats[id].favs++});
+        (v.plans||[]).forEach(k=>{const[id,x]=k.split("|");if(!stats[id])return;stats[id].go.add(d.id);stats[id].ses[x]=(stats[id].ses[x]||0)+1});
+      });
+      const rows=SHOWS.map(s=>({s,f:stats[s.id].favs,g:stats[s.id].go.size,ses:stats[s.id].ses})).sort((a,b)=>(b.f+b.g)-(a.f+a.g));
+      const max=Math.max(1,...rows.map(r=>Math.max(r.f,r.g)));
+      const totF=rows.reduce((a,r)=>a+r.f,0),totG=rows.reduce((a,r)=>a+Object.values(r.ses).reduce((x,y)=>x+y,0),0);
+      $("out").innerHTML=`<div class="kpis">
+        <div class="card kpi"><span class="label">Espaces créés</span><b>${people}</b></div>
+        <div class="card kpi"><span class="label">Espaces actifs</span><b>${active}</b></div>
+        <div class="card kpi"><span class="label">Favoris au total</span><b>${totF}</b></div>
+        <div class="card kpi"><span class="label">« J'y vais » au total</span><b>${totG}</b></div></div>
+      <div class="card"><h2>Par spectacle</h2><div class="scroll"><table>
+        <thead><tr><th>Spectacle</th><th class="n">Favoris</th><th class="n">Personnes « J'y vais »</th></tr></thead><tbody>
+        ${rows.map(r=>{const det=Object.entries(r.ses).sort(([a],[b])=>a.localeCompare(b));return `<tr><td><b>${esc(r.s.t)}</b>
+          <div class="bar" style="width:${Math.round(100*Math.max(r.f,r.g)/max)}%"></div>
+          ${det.length?`<details><summary>Détail par séance</summary><ul>${det.map(([x,n])=>`<li>${label(x)} : ${n}</li>`).join("")}</ul></details>`:""}</td>
+          <td class="n">${r.f}</td><td class="n">${r.g}</td></tr>`}).join("")}
+        </tbody></table></div></div>
+      <p class="muted">Chiffres anonymes. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
+      $("status").textContent="Mis à jour le "+new Date().toLocaleString("fr-FR");
+    }catch(e){
+      $("out").innerHTML=`<p class="err">Accès refusé ou erreur : ${esc(e.message)}. Vérifiez que vous êtes connecté avec l'adresse indiquée dans les règles Firestore.</p>`;
+      $("status").textContent="";
+    }
+  }
+}
+</script>
+</body>
+</html>

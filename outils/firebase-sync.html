@@ -1,0 +1,22 @@
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,setDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Envoi anonyme des favoris et des « J'y vais » vers Firestore (aucun nom n'est envoyé).
+const cfg=window.FIREBASE_CONFIG;
+if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
+  try{
+    const app=initializeApp(cfg),auth=getAuth(app),db=getFirestore(app);
+    let uid=null,timer=null;
+    const push=async()=>{
+      if(!uid||!window.chariotState)return;
+      const st=window.chariotState(),ref=doc(db,"votes",uid);
+      try{ if(st) await setDoc(ref,{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(ref); }
+      catch(e){console.warn("Envoi impossible",e)}
+    };
+    window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
+    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;push()}});
+    signInAnonymously(auth).catch(e=>console.warn("Connexion anonyme impossible",e));
+  }catch(e){console.warn(e)}
+}
+</script>
