@@ -46,6 +46,7 @@ h3{font-family:var(--display);font-weight:700;font-size:17px;margin:0}
 .seg{display:flex;gap:4px;background:var(--chip);padding:4px;border-radius:8px;margin-bottom:18px}
 .seg button{flex:1;border:0;background:transparent;color:var(--ink);font:600 13px var(--body);padding:10px 6px;border-radius:6px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+@media (max-width:460px){.seg{display:grid;grid-template-columns:1fr 1fr}}
 /* Calendrier */
 .cal{background:var(--chip);border:0;border-radius:8px;padding:12px;display:grid;gap:10px}
 .cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -296,16 +297,17 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
 <script>
 /* ==== DONNÉES DU PROGRAMME — début (mises à jour automatiquement depuis theatreduchariot.fr) ====
    Format de chaque séance : "MM-JJ HH:MM". Les séances complètes sont listées dans full:[...] (même format).
-   img : adresse de l'affiche sur le site Wix (static.wixstatic.com/media/...), utilisée par la version Netlify. */
+   img : adresse de l'affiche sur le site Wix (static.wixstatic.com/media/...), utilisée par la version Netlify.
+   Archives : arch:true, periode (texte affiché, ex. "3 – 20 sept."), pas de s/e/sessions. Un spectacle dont toutes les dates sont passées bascule tout seul dans les archives. */
 const MOIS=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
 const JOURS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
 const D=md=>{const[m,d]=md.split("-").map(Number);return new Date(Y,m-1,d)};
 const fd=dt=>`${dt.getDate()} ${MOIS[dt.getMonth()]}`;
-const range=s=>{const a=D(s.s),b=D(s.e);return a.getTime()===b.getTime()?fd(a):a.getMonth()===b.getMonth()?`${a.getDate()} – ${fd(b)}`:`${fd(a)} – ${fd(b)}`};
+const range=s=>{if(!s.s)return s.periode||"Archives";const a=D(s.s),b=D(s.e);return a.getTime()===b.getTime()?fd(a):a.getMonth()===b.getMonth()?`${a.getDate()} – ${fd(b)}`:`${fd(a)} – ${fd(b)}`};
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-const running=s=>D(s.s)<=today&&D(s.e)>=today;
-const upcoming=s=>D(s.s)>today;
+const running=s=>!!s.s&&D(s.s)<=today&&D(s.e)>=today;
+const upcoming=s=>!!s.s&&D(s.s)>today;
 const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const sesOf=s=>(s.sessions||[]).map(x=>new Date(Y,+x.slice(0,2)-1,+x.slice(3,5),+x.slice(6,8),+x.slice(9,11)));
 // « À l'affiche » = représentations d'aujourd'hui jusqu'au même jour la semaine prochaine inclus
@@ -315,7 +317,7 @@ const playsWeek=s=>inWeek(s).length>0;
 const nextSes=s=>sesOf(s).filter(d=>d>=weekEnd).sort((a,b)=>a-b)[0];
 const hhmm=d=>`${d.getHours()}h${d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""}`;
 const todayChip=s=>{const w=inWeek(s);if(!w.length)return "";const d=w[0];const j=JOURS[d.getDay()];const lab=sameDay(d,today)?"Aujourd'hui":(j[0].toUpperCase()+j.slice(1)+" "+fd(d));return `<span class="chip live">${lab} à ${hhmm(d)}${w.length>1?` · ${w.length} dates`:""}</span>`};
-const done=s=>D(s.e)<today;
+const done=s=>!s.s||D(s.e)<today;
 
 // Affiches « digitale » publiées à côté de la page (posters/<id>.jpg) ; sinon affiche typographique de secours
 // REMOTE_IMG : affiche du site Wix (champ img) quand il n'y a pas d'affiche locale. Désactivé ici (images extérieures bloquées), activé dans la version Netlify.
@@ -431,9 +433,12 @@ const views={
   const aff=SHOWS.filter(playsWeek).sort((a,b)=>inWeek(a)[0]-inWeek(b)[0]), ven=SHOWS.filter(s=>!playsWeek(s)&&nextSes(s)).sort((a,b)=>nextSes(a)-nextSes(b));
   const nextDay=SHOWS.map(nextSes).filter(Boolean).sort((a,b)=>a-b)[0];
   const next=SHOWS.flatMap(s=>(s.sessions||[]).map(x=>({s,dt:new Date(Y,+x.slice(0,2)-1,+x.slice(3,5),+x.slice(6,8),+x.slice(9,11))}))).filter(o=>o.dt>=now).sort((a,b)=>a.dt-b.dt)[0];
-  const list=state.seg==="affiche"?aff:ven;
-  const segs=`<div class="seg" role="group" aria-label="Filtrer"><button id="seg-cal" data-seg="calendrier" aria-pressed="${state.seg==="calendrier"}">Calendrier</button><button id="seg-affiche" data-seg="affiche" aria-pressed="${state.seg==="affiche"}">À l'affiche (${aff.length})</button><button id="seg-avenir" data-seg="avenir" aria-pressed="${state.seg==="avenir"}">À venir (${ven.length})</button></div>`;
+  // Archives : d'abord les spectacles de la saison qui viennent de se terminer (du plus récent au plus ancien), puis ceux de la page Archives du site
+  const arc=SHOWS.filter(done).map((s,i)=>({s,i})).sort((a,b)=>(b.s.s?D(b.s.e):0)-(a.s.s?D(a.s.e):0)||a.i-b.i).map(x=>x.s);
+  const list=state.seg==="affiche"?aff:state.seg==="archives"?arc:ven;
+  const segs=`<div class="seg" role="group" aria-label="Filtrer"><button id="seg-cal" data-seg="calendrier" aria-pressed="${state.seg==="calendrier"}">Calendrier</button><button id="seg-affiche" data-seg="affiche" aria-pressed="${state.seg==="affiche"}">À l'affiche (${aff.length})</button><button id="seg-avenir" data-seg="avenir" aria-pressed="${state.seg==="avenir"}">À venir (${ven.length})</button><button id="seg-arch" data-seg="archives" aria-pressed="${state.seg==="archives"}">Archives (${arc.length})</button></div>`;
   if(state.seg==="calendrier")return `<h1>Programmation</h1><p class="lede">Toutes les représentations, jour par jour.</p>${segs}${calendar()}`;
+  if(state.seg==="archives")return `<h1>Programmation</h1><p class="lede">Les spectacles déjà joués au Chariot. Vous pouvez toujours les ajouter à vos favoris.</p>${segs}<div class="list">${arc.map(card).join("")||'<p class="small">Aucun spectacle archivé pour le moment.</p>'}</div>`;
   return `<h1>Programmation</h1><p class="lede">Théâtre contemporain, musique et marionnette, saison 2026–27.</p>
   ${next?`<div class="today"><span class="label">Prochaine représentation</span><strong>${esc(next.s.t)}</strong><span>${JOURS[next.dt.getDay()]} ${fd(next.dt)} à ${next.dt.getHours()}h${String(next.dt.getMinutes()).padStart(2,"0").replace("00","")}</span></div>`:""}
   ${segs}
@@ -529,7 +534,7 @@ function openShow(id,keep){
    <button class="btn ghost back" id="close">← Retour</button>
    ${poster(s,"hero-poster")}
    <div><div class="label">${range(s)}</div><h2 style="font-size:28px;margin-top:4px">${esc(s.t)}</h2><div class="small" style="font-size:15px">${esc(s.by)}</div></div>
-   <div class="meta">${todayChip(s)}${[s.genre,s.age,s.dur].filter(Boolean).map(c=>`<span class="chip">${esc(c)}</span>`).join("")}</div>
+   <div class="meta">${done(s)?'<span class="chip">Archive · déjà joué</span>':""}${todayChip(s)}${[s.genre,s.age,s.dur].filter(Boolean).map(c=>`<span class="chip">${esc(c)}</span>`).join("")}</div>
    <div><button class="fav" data-fav="${s.id}" aria-pressed="${isFav(s.id)}">${isFav(s.id)?"♥ Dans mes favoris":"♡ Ajouter aux favoris"}</button></div>
    <p style="margin:0">${esc(s.d)}</p>
    ${isFav(s.id)&&similar(s,3).length?`<div class="card"><span class="label">Pour vous, puisque vous aimez ${esc(s.t)}</span><div class="list">${similar(s,3).map(x=>recoItem(x,false)).join("")}</div></div>`:""}
