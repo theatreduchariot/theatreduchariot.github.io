@@ -11,4 +11,4 @@ self.FIREBASE_CONFIG = {
 };
 // Clé publique des notifications (Firebase > Paramètres du projet > Cloud Messaging >
 // Configuration Web > Certificats Web Push > Paire de clés). Publique, non secrète.
-self.FIREBASE_VAPID_KEY = "A_REMPLACER";
+self.FIREBASE_VAPID_KEY = "BBFtXa-6nkWkRPsOSGWOK0CqtQYuy-8XW-sRwltitFGPFjYZpdGu6c9RYgcUsnKP8cWKbu9iduJoYAV0uFC374M";
