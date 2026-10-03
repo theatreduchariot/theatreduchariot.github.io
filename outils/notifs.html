@@ -17,6 +17,10 @@ import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/1
 import {getMessaging,getToken,deleteToken,onMessage,isSupported} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $=id=>document.getElementById(id);
+// Diagnostic : ouvrir l'appli avec ?debug pour afficher ce qui se passe à l'écran.
+const DBG=/[?&]debug/.test(location.search);
+window.chariotLog=m=>{if(!DBG)return;let b=$("dbg");if(!b){b=document.createElement("pre");b.id="dbg";b.style.cssText="position:fixed;left:8px;right:8px;top:8px;z-index:99;background:#000;color:#0f0;font:12px/1.4 monospace;padding:8px;border-radius:6px;white-space:pre-wrap;max-height:60vh;overflow:auto";document.body.appendChild(b)}b.textContent+=new Date().toTimeString().slice(0,8)+" "+m+"\n"};
+const log=window.chariotLog;
 const cfg=self.FIREBASE_CONFIG, vapid=self.FIREBASE_VAPID_KEY;
 const KEY="chariot-notifs";
 const get=()=>{try{return localStorage.getItem(KEY)}catch(e){return null}};
@@ -27,9 +31,10 @@ const standalone=matchMedia("(display-mode: standalone)").matches||navigator.sta
 const say=t=>{try{toast(t)}catch(e){}};
 
 async function main(){
+  log("Notification: "+(("Notification" in window)?Notification.permission:"absent")+" | SW: "+("serviceWorker" in navigator)+" | standalone: "+standalone);
   if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")||!vapid||vapid.startsWith("A_REMPLACER"))return;
   if(!("Notification" in window)||!("serviceWorker" in navigator))return;
-  if(!(await isSupported().catch(()=>false)))return;
+  if(!(await isSupported().catch(()=>false))){log("Messaging non supporté");return}
   if(ios&&!standalone)return; // sur iPhone, les notifications ne marchent qu'avec l'appli installée
 
   const app=getApps().length?getApp():initializeApp(cfg);
@@ -44,8 +49,10 @@ async function main(){
     const RK="chariot-fcm",V=2,AGE=3*864e5,now=Date.now();
     let last={};try{last=JSON.parse(localStorage.getItem(RK)||"{}")}catch(e){}
     const refresh=last.v!==V||!last.t||now-last.t>AGE;
-    if(refresh){try{await getToken(messaging,opts);await deleteToken(messaging)}catch(e){console.warn(e)}}
-    const t=await getToken(messaging,opts);
+    log("Renouvellement : "+refresh);
+    if(refresh){try{const o=await getToken(messaging,opts);log("Ancienne adresse : "+(o||"").slice(0,12)+"… ("+(o||"").length+")");await deleteToken(messaging);log("Ancienne adresse supprimée")}catch(e){log("Erreur suppression : "+(e.code||"")+" "+e.message)}}
+    let t;try{t=await getToken(messaging,opts)}catch(e){log("Erreur getToken : "+(e.code||"")+" "+e.message);throw e}
+    log("Adresse : "+(t||"").slice(0,12)+"… ("+(t||"").length+")");
     if(t&&refresh){try{localStorage.setItem(RK,JSON.stringify({v:V,t:now}))}catch(e){}}
     // Transmis (anonymement) pour les notifications automatiques : voir outils/firebase-sync.html
     if(t){window.chariotToken=t;if(window.chariotSync)window.chariotSync();}
@@ -59,7 +66,7 @@ async function main(){
     catch(e){say(n.title||"Nouveau message du Chariot")}
   });
 
-  if(Notification.permission==="granted"){subscribe().catch(()=>{});return}
+  if(Notification.permission==="granted"){subscribe().catch(e=>log("Échec : "+(e.code||"")+" "+e.message));return}
   if(Notification.permission==="denied"||get())return;
 
   // Proposition affichée après les fenêtres d'accueil et d'installation.

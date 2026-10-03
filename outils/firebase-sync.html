@@ -18,13 +18,14 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
       catch(e){console.warn("Envoi impossible",e)}
       const tk=window.chariotToken;
       if(tk){
-        try{ await setDoc(doc(db,"tokens",uid),{token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}); }
-        catch(e){console.warn("Abonnement aux notifications non enregistré",e)}
+        const L=window.chariotLog||(()=>{});
+        try{ await setDoc(doc(db,"tokens",uid),{token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}); L("Abonnement enregistré dans Firestore"); }
+        catch(e){console.warn("Abonnement aux notifications non enregistré",e);L("Erreur Firestore : "+(e.code||"")+" "+e.message)}
       }
     };
     window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
-    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;push()}});
-    signInAnonymously(auth).catch(e=>console.warn("Connexion anonyme impossible",e));
+    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;(window.chariotLog||(()=>{}))("Connexion anonyme OK");push()}});
+    signInAnonymously(auth).catch(e=>{console.warn("Connexion anonyme impossible",e);(window.chariotLog||(()=>{}))("Erreur connexion : "+(e.code||"")+" "+e.message)});
   }catch(e){console.warn(e)}
 }
 </script>
