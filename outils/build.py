@@ -9,7 +9,8 @@ Utilisation :  python3 outils/build.py chemin/vers/artefact.html
 - Les affiches du site Wix (champ img) sont activées (REMOTE_IMG = true).
 - Le texte de confidentialité est adapté : la version Netlify envoie les favoris
   et les « J'y vais » de façon anonyme (Firebase).
-- site/firebase-config.js, site/admin.html et site/posters/ ne sont jamais modifiés.
+- La proposition d'installation de l'appli (outils/install.html) est ajoutée.
+- site/firebase-config.js, site/admin.html, site/sw.js et site/posters/ ne sont jamais modifiés.
 """
 import pathlib
 import re
@@ -82,6 +83,9 @@ def main(src_path):
     k = rest.index("<script>\n")
     rest = rest[:k] + '<script src="firebase-config.js"></script>\n<script src="shows.js"></script>\n' + firebase + rest[k:]
 
+    # Proposition d'installation (Android : bouton Installer ; iPhone : explications)
+    install = (SITE.parent / "outils" / "install.html").read_text(encoding="utf-8")
+
     html = (
         '<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
@@ -91,7 +95,7 @@ def main(src_path):
         # sans [hidden]{display:none}, les fenêtres (message d'accueil…) ne se ferment pas.
         '<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}'
         'html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}[hidden]{display:none!important}</style>\n'
-        + head + "\n</head>\n<body>\n" + rest + "</body>\n</html>\n"
+        + head + "\n</head>\n<body>\n" + rest + install + "</body>\n</html>\n"
     )
     html = html.replace("body{background:var(--bg)", "body{margin:0;background:var(--bg)", 1)
 

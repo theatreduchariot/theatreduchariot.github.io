@@ -1,0 +1,65 @@
+<!-- Proposition d'installation de l'appli (ajoutée par outils/build.py) -->
+<style>
+.install{position:fixed;left:0;right:0;bottom:0;z-index:35;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;background:rgba(0,0,0,.45)}
+.install-box{background:var(--surface);border-radius:12px;max-width:520px;width:100%;padding:18px;display:grid;gap:12px;border-top:6px solid var(--accent);box-shadow:0 -2px 16px rgba(0,0,0,.2)}
+.install-head{display:flex;gap:12px;align-items:center}
+.install-head img{width:52px;height:52px;border-radius:12px;flex:none}
+.install-head b{display:block;font:700 18px var(--display)}
+.install ol{margin:0;padding-left:20px;display:grid;gap:6px}
+.install .row{display:flex;gap:8px;flex-wrap:wrap}
+.install .row .btn{flex:1}
+.ios-share{display:inline-block;width:18px;height:18px;vertical-align:-3px}
+</style>
+<div class="install" id="install" role="dialog" aria-modal="true" aria-labelledby="install-title" hidden>
+  <div class="install-box">
+    <div class="install-head"><img src="icon-192.png" alt=""><div><b id="install-title">Installez l'appli du Chariot</b><span class="small">Gratuit, sans passer par un store. Une icône sur votre écran d'accueil, comme une vraie appli.</span></div></div>
+    <div id="install-android" hidden>
+      <div class="row"><button class="btn" id="install-go" type="button">Installer</button><button class="btn ghost" id="install-later" type="button">Plus tard</button></div>
+    </div>
+    <div id="install-manual" hidden>
+      <ol id="install-steps"></ol>
+      <div class="row"><button class="btn" id="install-ok" type="button">C'est fait</button><button class="btn ghost" id="install-later2" type="button">Plus tard</button></div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const KEY="chariot-install";
+  const get=()=>{try{return localStorage.getItem(KEY)}catch(e){return null}};
+  const set=v=>{try{localStorage.setItem(KEY,v)}catch(e){}};
+  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  const ua=navigator.userAgent;
+  const ios=/iphone|ipad|ipod/i.test(ua)||(/macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
+  const mobile=ios||/android/i.test(ua);
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+  if(standalone||!mobile||get())return;
+
+  let deferred=null;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;});
+  window.addEventListener("appinstalled",()=>{set("installee");hide()});
+
+  const share='<svg class="ios-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Partager"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  function hide(){$("install").hidden=true;document.body.style.overflow=""}
+  function later(){set("plus-tard");hide()}
+  function show(){
+    if(deferred){$("install-android").hidden=false}
+    else{
+      $("install-steps").innerHTML=ios
+        ?'<li>Touchez le bouton <b>Partager</b> '+share+' en bas de l\'écran (ou en haut sur iPad).</li><li>Choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.</li>'
+        :'<li>Ouvrez le menu du navigateur <b>⋮</b> (en haut à droite).</li><li>Choisissez <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>.</li>';
+      $("install-manual").hidden=false;
+    }
+    $("install").hidden=false;
+  }
+  $("install-go").addEventListener("click",async()=>{if(!deferred)return;deferred.prompt();const r=await deferred.userChoice.catch(()=>null);deferred=null;if(r&&r.outcome==="accepted")set("installee");hide()});
+  $("install-later").addEventListener("click",later);
+  $("install-later2").addEventListener("click",later);
+  $("install-ok").addEventListener("click",()=>{set("installee");hide()});
+
+  // On attend que le message de bienvenue soit fermé, puis un court instant (Android a le temps de signaler l'installation possible).
+  function start(){setTimeout(show,1200)}
+  const w=$("welcome");
+  if(w&&!w.hidden)$("welcome-ok").addEventListener("click",start);else start();
+})();
+</script>
