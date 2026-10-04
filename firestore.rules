@@ -15,9 +15,10 @@ service cloud.firestore {
       }
       function validData() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['favs', 'plans', 'updatedAt'])
+        return d.keys().hasOnly(['favs', 'plans', 'ratings', 'updatedAt'])
           && d.favs is list && d.favs.size() <= 50
-          && d.plans is list && d.plans.size() <= 200;
+          && d.plans is list && d.plans.size() <= 200
+          && (!('ratings' in d) || (d.ratings is map && d.ratings.size() <= 100));
       }
 
       allow create, update: if isOwner() && validData();
@@ -29,10 +30,11 @@ service cloud.firestore {
     // favoris et « J'y vais » pour les rappels. Lu seulement par l'envoi automatique (GitHub).
     match /tokens/{uid} {
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['token', 'favs', 'plans', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['token', 'favs', 'plans', 'alerts', 'updatedAt'])
         && request.resource.data.token is string && request.resource.data.token.size() < 500
         && request.resource.data.favs is list && request.resource.data.favs.size() <= 50
-        && request.resource.data.plans is list && request.resource.data.plans.size() <= 200;
+        && request.resource.data.plans is list && request.resource.data.plans.size() <= 200
+        && (!('alerts' in request.resource.data) || (request.resource.data.alerts is list && request.resource.data.alerts.size() <= 50));
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 

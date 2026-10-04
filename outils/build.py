@@ -76,14 +76,17 @@ def main(src_path):
     # 5. Textes de confidentialité adaptés à l'envoi anonyme
     swaps = [
         ("Pas de mot de passe : vos informations restent sur ce téléphone et ne sont envoyées à personne.",
-         "Pas de mot de passe. Votre nom et votre prénom restent sur ce téléphone. Le théâtre reçoit seulement, de façon anonyme, vos favoris et vos « J'y vais »."),
+         "Pas de mot de passe. Votre nom et votre prénom restent sur ce téléphone. Le théâtre reçoit seulement, de façon anonyme, vos favoris, vos « J'y vais », vos alertes et vos avis."),
         ('<h2 id="welcome-title">Vos données restent chez vous</h2>',
          '<h2 id="welcome-title">Vos données personnelles restent chez vous</h2>'),
         ("<p>Cette application ne collecte aucune donnée personnelle.</p>",
          "<p>Cette application ne collecte aucune donnée personnelle : ni nom, ni e-mail, ni numéro de téléphone.</p>"),
         ("pas de publicité ni de suivi.", "pas de publicité ni de traceur publicitaire."),
         ("vos nom, prénom, favoris et séances notées sont enregistrés <b>uniquement sur ce téléphone</b>. Ils ne sont envoyés ni au théâtre ni à personne.</li>",
-         "vos nom et prénom sont enregistrés <b>uniquement sur ce téléphone</b>.</li>\n      <li>Vos favoris et vos « J'y vais » sont transmis au théâtre <b>de façon anonyme</b> (sans nom, avec un identifiant technique aléatoire), pour savoir quels spectacles intéressent le public. Supprimer votre espace efface aussi ces données.</li>"),
+         "vos nom et prénom sont enregistrés <b>uniquement sur ce téléphone</b>.</li>\n      <li>Vos favoris, vos « J'y vais », vos alertes « place libérée » et vos avis sont transmis au théâtre <b>de façon anonyme</b> (sans nom, avec un identifiant technique aléatoire), pour savoir quels spectacles intéressent le public. Supprimer votre espace efface aussi ces données.</li>"),
+        ("Votre avis reste sur ce téléphone.", "Votre avis est transmis au théâtre et à la compagnie, sans votre nom."),
+        ("Vos favoris, séances notées, alertes, carnet et avis seront effacés de ce téléphone.",
+         "Vos favoris, séances notées, alertes, carnet et avis seront effacés de ce téléphone, ainsi que les données anonymes envoyées au théâtre."),
     ]
     for old, new in swaps:
         rest = rest.replace(old, new)
@@ -92,7 +95,7 @@ def main(src_path):
     rest = rest.replace(
         'function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}}',
         'function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}if(window.chariotSync)window.chariotSync()}\n'
-        'window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice()}:null;')
+        'window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}]))}:null;')
     rest = rest.replace('try{localStorage.removeItem("chariot-compte")}catch(err){}',
                         'try{localStorage.removeItem("chariot-compte")}catch(err){}if(window.chariotSync)window.chariotSync();')
     if "window.chariotState" not in rest:

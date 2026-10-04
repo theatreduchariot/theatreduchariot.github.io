@@ -159,6 +159,38 @@ nav.tabs button{border:0;background:none;color:var(--muted);font:600 11px var(--
 nav.tabs button[aria-current="page"]{color:var(--ink)}
 nav.tabs button[aria-current="page"] svg{background:var(--accent);border-radius:999px;padding:3px 12px;width:48px;height:28px;margin-block:-3px}
 nav.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.qf{display:flex;gap:8px;overflow-x:auto;margin:-4px -16px 14px;padding:2px 16px;scrollbar-width:none}
+.qf::-webkit-scrollbar{display:none}
+.qf button{flex:none;border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 13px var(--body);cursor:pointer;white-space:nowrap}
+.qf button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.when-list{margin:6px 0 0;font-size:13px;color:var(--accent-text);font-weight:600}
+.notice{border-left:6px solid var(--accent)}
+.row-act{display:flex;gap:8px;flex-wrap:wrap}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.select{font:500 15px var(--body);padding:11px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);width:100%}
+.sessions li.full.watch{border-color:var(--accent);border-style:dashed}
+.sessions li.full.watch::after{content:"Complet · Alerte activée";color:var(--accent-text)}
+.stars{display:flex;gap:2px}
+.stars button{border:0;background:none;font-size:32px;line-height:1;color:#d6d6d6;cursor:pointer;padding:2px 3px}
+.stars button[aria-pressed="true"]{color:var(--accent)}
+.stars-ro{color:var(--accent-text);letter-spacing:1px}
+.rate textarea{font:500 15px var(--body);padding:10px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);width:100%;min-height:72px;resize:vertical}
+.big{font:800 46px/1 var(--display);color:var(--accent-text)}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.badge{border-radius:8px;padding:10px 8px;background:var(--soft);display:grid;gap:2px;text-align:center;align-content:start}
+.badge .i{font-size:28px;line-height:1.2}
+.badge b{font:700 13px/1.2 var(--display)}
+.badge span{font-size:11px;color:var(--muted);line-height:1.3}
+.badge.off{background:var(--chip);opacity:.55;filter:grayscale(1)}
+.seen-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:8px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.cd-row{display:flex;gap:16px;align-items:center}
+.cd-big{font:800 42px/1 var(--display);color:var(--accent-text);flex:none}
+.qf .surprise{border-color:var(--accent);color:var(--accent-text)}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--chip);border-radius:8px;padding:10px 12px}
+.stat b{display:block;font:800 22px/1.15 var(--display)}
+.stat span{font-size:12px;color:var(--muted)}
+.bilan-img{width:100%;max-width:360px;justify-self:center;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.18)}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
 </head>
@@ -279,6 +311,7 @@ main();
 
 <div class="sheet" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
+<div class="welcome" id="invite" role="dialog" aria-modal="true" aria-labelledby="inv-title" hidden></div>
 <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" hidden>
   <div class="welcome-box">
     <span class="label">Bienvenue au Chariot</span>
@@ -287,7 +320,7 @@ main();
     <ul>
       <li>Pas de compte en ligne, pas de mot de passe, pas de publicité ni de traceur publicitaire.</li>
       <li>Si vous créez « Mon espace », vos nom et prénom sont enregistrés <b>uniquement sur ce téléphone</b>.</li>
-      <li>Vos favoris et vos « J'y vais » sont transmis au théâtre <b>de façon anonyme</b> (sans nom, avec un identifiant technique aléatoire), pour savoir quels spectacles intéressent le public. Supprimer votre espace efface aussi ces données.</li>
+      <li>Vos favoris, vos « J'y vais », vos alertes « place libérée » et vos avis sont transmis au théâtre <b>de façon anonyme</b> (sans nom, avec un identifiant technique aléatoire), pour savoir quels spectacles intéressent le public. Supprimer votre espace efface aussi ces données.</li>
       <li>Vous pouvez tout effacer à tout moment depuis « Mon espace », ou en effaçant les données de votre navigateur.</li>
       <li>Les liens vers la billetterie Eventim, les inscriptions aux ateliers, Google Maps, Instagram ou TikTok ouvrent des sites extérieurs, qui ont leurs propres règles.</li>
     </ul>
@@ -315,12 +348,14 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
     const push=async()=>{
       if(!uid)return;
       const st=window.chariotState?window.chariotState():null;
-      try{ if(st) await setDoc(doc(db,"votes",uid),{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(doc(db,"votes",uid)); }
+      // Si les règles Firestore n'acceptent pas encore les avis/alertes, on renvoie sans ces champs.
+      const put=async(name,full,base)=>{try{await setDoc(doc(db,name,uid),full)}catch(e){if(e&&e.code==="permission-denied"){await setDoc(doc(db,name,uid),base)}else throw e}};
+      try{ if(st) await put("votes",{favs:st.favs,plans:st.plans,ratings:st.ratings||{},updatedAt:serverTimestamp()},{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(doc(db,"votes",uid)); }
       catch(e){console.warn("Envoi impossible",e)}
       const tk=window.chariotToken;
       if(tk){
         const L=window.chariotLog||(()=>{});
-        try{ await setDoc(doc(db,"tokens",uid),{token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}); L("Abonnement enregistré dans Firestore"); }
+        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[]},b); L("Abonnement enregistré dans Firestore"); }
         catch(e){console.warn("Abonnement aux notifications non enregistré",e);L("Erreur Firestore : "+(e.code||"")+" "+e.message)}
       }
     };
@@ -372,10 +407,10 @@ function card(s){
 
 let state={tab:"programme",seg:"affiche",calM:null,calD:null,q:""};
 let storeOK=true;
-let acct={name:"",last:"",favs:[],plans:[]};
-try{const a=JSON.parse(localStorage.getItem("chariot-compte")||"null");if(a)acct={name:a.name||"",last:a.last||"",favs:a.favs||[],plans:a.plans||[]}}catch(e){storeOK=false}
+let acct={name:"",last:"",favs:[],plans:[],alerts:[],seen:[],ratings:{},later:[]};
+try{const a=JSON.parse(localStorage.getItem("chariot-compte")||"null");if(a)acct={name:a.name||"",last:a.last||"",favs:a.favs||[],plans:a.plans||[],alerts:a.alerts||[],seen:a.seen||[],ratings:a.ratings||{},later:a.later||[]}}catch(e){storeOK=false}
 function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}if(window.chariotSync)window.chariotSync()}
-window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice()}:null;
+window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}]))}:null;
 const hasAcct=()=>!!(acct.name&&acct.last);
 const isFull=(s,x)=>(s.full||[]).includes(x);
 const isFav=id=>acct.favs.includes(id);
@@ -515,7 +550,7 @@ const views={
    <form class="card" id="signup"><h2>Créer mon espace</h2>
     <div class="field"><label class="label" for="acct-name">Prénom</label><input id="acct-name" name="name" autocomplete="given-name" required maxlength="40" placeholder="Votre prénom" value="${esc(acct.name)}"></div>
     <div class="field"><label class="label" for="acct-last">Nom</label><input id="acct-last" name="last" autocomplete="family-name" required maxlength="60" placeholder="Votre nom"></div>
-    <p class="small">Pas de mot de passe. Votre nom et votre prénom restent sur ce téléphone. Le théâtre reçoit seulement, de façon anonyme, vos favoris et vos « J'y vais ».</p>
+    <p class="small">Pas de mot de passe. Votre nom et votre prénom restent sur ce téléphone. Le théâtre reçoit seulement, de façon anonyme, vos favoris, vos « J'y vais », vos alertes et vos avis.</p>
     <button class="btn" type="submit">Créer mon espace</button>${warn}</form>`;
   }
   const favs=SHOWS.filter(s=>isFav(s.id));
@@ -525,6 +560,10 @@ const views={
   return `<div class="who" style="margin-bottom:18px"><div class="avatar" aria-hidden="true">${esc((acct.name[0]+(acct.last[0]||"")).toUpperCase())}</div><div><h1 style="margin:0;text-transform:none">Bonjour ${esc(acct.name)}</h1><span class="small">${esc(acct.name)} ${esc(acct.last)} · Votre espace Chariot</span></div></div>
   ${warn}
   <div class="stack">
+   ${countdownHTML()}
+   ${noticesHTML(false)}
+   ${carnetHTML()}
+   ${bilanHTML()}
    <section class="card"><span class="label">Pour vous</span>
     ${(()=>{const r=recommend(3);if(!acct.favs.length)return '<p class="small">Ajoutez des spectacles à vos favoris : nous vous proposerons ici des spectacles proches.</p>';if(!r.length)return '<p class="small">Pas encore de suggestion : ajoutez d\'autres favoris.</p>';return `<div class="list">${r.map(x=>recoItem(x,false)).join("")}</div>`})()}
    </section>
@@ -535,7 +574,7 @@ const views={
    <section class="card"><span class="label">Mes favoris</span>
     ${favs.length?`<div class="list">${favs.map(card).join("")}</div>`:'<p class="small">Aucun favori. Touchez « Ajouter aux favoris » dans la fiche d\'un spectacle.</p>'}
    </section>
-   ${past.length?`<section class="card"><span class="label">Déjà vus</span>${past.map(row).join("")}</section>`:""}
+   ${alertsHTML()}
    <section class="card"><span class="label">Mon profil</span>
     <form id="rename" class="stack"><div class="field"><label class="label" for="acct-rename">Prénom</label><input id="acct-rename" name="name" autocomplete="given-name" value="${esc(acct.name)}" required maxlength="40"></div><div class="field"><label class="label" for="acct-relast">Nom</label><input id="acct-relast" name="last" autocomplete="family-name" value="${esc(acct.last)}" required maxlength="60"></div><button class="btn ghost" type="submit">Enregistrer</button></form>
     <div id="del-zone"><button class="btn ghost" id="del-ask" type="button">Supprimer mon espace</button></div>
@@ -568,17 +607,20 @@ function searchShows(q){
 }
 function fillSearch(){
   const box=document.getElementById("search-res"),body=document.getElementById("prog-body");if(!box||!body)return;
-  const q=(state.q||"").trim();
-  body.hidden=!!q; const clr=document.getElementById("q-clear"); if(clr)clr.hidden=!q;
-  if(!q){box.innerHTML="";return}
-  const r=searchShows(q);
-  box.innerHTML=r.length?`<p class="small" style="margin:0 0 10px">${r.length} spectacle${r.length>1?"s":""} trouvé${r.length>1?"s":""}</p><div class="list">${r.map(card).join("")}</div>`
-    :`<p class="small">Aucun spectacle ne correspond à « ${esc(q)} ». Essayez un titre, un nom d'artiste, une compagnie ou un thème (ex. « marionnette », « famille »).</p>`;
+  const q=(state.q||"").trim(), f=state.qf||"";
+  body.hidden=!!(q||f); const clr=document.getElementById("q-clear"); if(clr)clr.hidden=!q;
+  document.querySelectorAll("[data-qf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.qf===f)));
+  if(!q&&!f){box.innerHTML="";return}
+  let r=q?searchShows(q):SHOWS.filter(s=>!done(s)).sort((a,b)=>(firstFuture(a)||0)-(firstFuture(b)||0));
+  if(f)r=r.filter(QF[f].test);
+  const what=(f?QF[f].txt:"")+(q?` pour « ${esc(q)} »`:"");
+  box.innerHTML=r.length?`<p class="small" style="margin:0 0 10px">${r.length} spectacle${r.length>1?"s":""} ${what}</p><div class="list">${r.map(s=>f&&QF[f].when?`<div>${card(s)}<p class="when-list">${QF[f].when(s)}</p></div>`:card(s)).join("")}</div>`
+    :(f?`<p class="small">${QF[f].empty}${q?` (avec « ${esc(q)} »)`:""}</p>`:`<p class="small">Aucun spectacle ne correspond à « ${esc(q)} ». Essayez un titre, un nom d'artiste, une compagnie ou un thème (ex. « marionnette », « famille »).</p>`);
 }
 const _programme=views.programme;
 views.programme=function(){
   const h=_programme(),i=h.indexOf("</p>")+4;
-  const bar=`<div class="search" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><label class="sr" for="q">Rechercher un spectacle</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher un spectacle, un artiste, un thème…" value="${esc(state.q||"")}"><button type="button" id="q-clear" aria-label="Effacer la recherche" ${state.q?"":"hidden"}>×</button></div><div id="search-res"></div>`;
+  const bar=`<div class="search" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><label class="sr" for="q">Rechercher un spectacle</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher un spectacle, un artiste, un thème…" value="${esc(state.q||"")}"><button type="button" id="q-clear" aria-label="Effacer la recherche" ${state.q?"":"hidden"}>×</button></div><div class="qf" role="group" aria-label="Filtres rapides">${Object.entries(QF).map(([k,v])=>`<button type="button" data-qf="${k}" aria-pressed="${state.qf===k}">${v.label}</button>`).join("")}<button type="button" class="surprise" data-surprise="1">🎲 Surprenez-moi</button></div><div id="search-res"></div>`;
   return h.slice(0,i)+bar+`<div id="prog-body">`+h.slice(i)+`</div>`;
 };
 
@@ -591,17 +633,20 @@ function render(){
 }
 function openShow(id,keep){
   const s=SHOWS.find(x=>x.id===id); if(!s)return; openId=id; const top=sheet.scrollTop;
-  const ses=(s.sessions||[]).map(x=>{const dt=sesDate(x),k=planKey(s.id,x),go=acct.plans.includes(k),past=dt<now,full=isFull(s,x);return `<li class="${past?"past":""} ${go?"going":""} ${full&&!past?"full":""}">${past||(full&&!go)?`<b>${JOURS[dt.getDay()]} ${fd(dt)}</b>${hm(dt)}`:`<button data-plan="${k}" aria-pressed="${go}"><b>${JOURS[dt.getDay()]} ${fd(dt)}</b>${hm(dt)}</button>`}</li>`}).join("");
+  const ses=(s.sessions||[]).map(x=>{const dt=sesDate(x),k=planKey(s.id,x),go=acct.plans.includes(k),past=dt<now,full=isFull(s,x);const al=acct.alerts.includes(k);return `<li class="${past?"past":""} ${go?"going":""} ${full&&!past?"full":""} ${al&&full&&!past?"watch":""}">${past?`<b>${JOURS[dt.getDay()]} ${fd(dt)}</b>${hm(dt)}`:(full&&!go)?`<button data-alert="${k}" aria-pressed="${al}" aria-label="${JOURS[dt.getDay()]} ${fd(dt)} ${hm(dt)}, complet : ${al?"retirer l'alerte":"être prévenu si une place se libère"}"><b>${JOURS[dt.getDay()]} ${fd(dt)}</b>${hm(dt)}</button>`:`<button data-plan="${k}" aria-pressed="${go}"><b>${JOURS[dt.getDay()]} ${fd(dt)}</b>${hm(dt)}</button>`}</li>`}).join("");
   const futureSes=(s.sessions||[]).filter(x=>sesDate(x)>=now), allFull=futureSes.length>0&&futureSes.every(x=>isFull(s,x));
   sheet.innerHTML=`<div class="sheet-inner">
    <button class="btn ghost back" id="close">← Retour</button>
    ${poster(s,"hero-poster")}
    <div><div class="label">${range(s)}</div><h2 style="font-size:28px;margin-top:4px">${esc(s.t)}</h2><div class="small" style="font-size:15px">${esc(s.by)}</div></div>
    <div class="meta">${done(s)?'<span class="chip">Archive · déjà joué</span>':""}${todayChip(s)}${[s.genre,s.age,s.dur].filter(Boolean).map(c=>`<span class="chip">${esc(c)}</span>`).join("")}</div>
-   <div><button class="fav" data-fav="${s.id}" aria-pressed="${isFav(s.id)}">${isFav(s.id)?"♥ Dans mes favoris":"♡ Ajouter aux favoris"}</button></div>
+   <div class="row-act"><button class="fav" data-fav="${s.id}" aria-pressed="${isFav(s.id)}">${isFav(s.id)?"♥ Dans mes favoris":"♡ Ajouter aux favoris"}</button><button class="fav" data-share="${s.id}">↗ Partager</button>${myNext(s)?`<button class="fav" data-invite="${s.id}|${myNext(s)}">👥 Inviter des amis</button>`:""}${hasPast(s)?`<button class="fav" data-seen="${s.id}" aria-pressed="${isSeen(s.id)}">${isSeen(s.id)?"✓ Vu":"Je l'ai vu"}</button>`:""}</div>
    <p style="margin:0">${esc(s.d)}</p>
    ${isFav(s.id)&&similar(s,3).length?`<div class="card"><span class="label">Pour vous, puisque vous aimez ${esc(s.t)}</span><div class="list">${similar(s,3).map(x=>recoItem(x,false)).join("")}</div></div>`:""}
    ${ses?`<div><div class="label" style="margin-bottom:8px">Représentations${hasAcct()?" · touchez une date pour noter « J'y vais »":""}</div><ul class="sessions">${ses}</ul></div>`:""}
+   ${futureSes.some(x=>isFull(s,x))?`<p class="small" style="margin:-8px 0 0">Une séance est complète ? Touchez-la pour être prévenu·e si une place se libère.</p>`:""}
+   ${agendaBox(s)}
+   ${isSeen(s.id)?`<div class="card"><span class="label">Votre avis</span>${rateBox(s.id)}</div>`:""}
    ${s.credits?`<ul class="credits">${s.credits.map(([k,v])=>`<li>${esc(k)} : <b>${esc(v)}</b></li>`).join("")}</ul>`:""}
    <div class="actions">${done(s)?"":allFull?`<span class="btn full-btn" aria-disabled="true">Complet</span>`:`<a class="btn" href="${s.book||BILLET}" target="_blank" rel="noopener">Réserver</a>`}${!done(s)&&!allFull&&futureSes.some(x=>isFull(s,x))?`<p class="small" style="margin:0;text-align:center">Les dates marquées « Complet » ne sont plus en vente.</p>`:""}<a class="btn ghost" href="${SITE}${s.url}" target="_blank" rel="noopener">Fiche complète sur le site</a></div>
   </div>`;
@@ -617,8 +662,8 @@ document.addEventListener("click",e=>{
   const t=e.target.closest("[data-tab],[data-seg],[data-cal],[data-day],[data-show],[data-copy],[data-fav],[data-plan],#close,#del-ask,#del-yes,#del-no"); if(!t)return;
   if(t.dataset.fav){if(needAccount())return;const id=t.dataset.fav;acct.favs=isFav(id)?acct.favs.filter(x=>x!==id):[...acct.favs,id];saveAcct();openShow(id,true);render();toast(isFav(id)?"Ajouté aux favoris":"Retiré des favoris")}
   else if(t.dataset.plan){if(needAccount())return;const k=t.dataset.plan;const on=acct.plans.includes(k);acct.plans=on?acct.plans.filter(x=>x!==k):[...acct.plans,k];saveAcct();openShow(openId,true);render();toast(on?"Séance retirée":"Séance ajoutée à Mon espace")}
-  else if(t.id==="del-ask"){document.getElementById("del-zone").innerHTML='<p class="small" style="margin:0 0 8px">Vos favoris et séances notées seront effacés de ce téléphone.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="del-yes" type="button">Oui, supprimer</button><button class="btn ghost" id="del-no" type="button">Annuler</button></div>'}
-  else if(t.id==="del-yes"){acct={name:"",last:"",favs:[],plans:[]};try{localStorage.removeItem("chariot-compte")}catch(err){}if(window.chariotSync)window.chariotSync();render();toast("Espace supprimé")}
+  else if(t.id==="del-ask"){document.getElementById("del-zone").innerHTML='<p class="small" style="margin:0 0 8px">Vos favoris, séances notées, alertes, carnet et avis seront effacés de ce téléphone, ainsi que les données anonymes envoyées au théâtre.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="del-yes" type="button">Oui, supprimer</button><button class="btn ghost" id="del-no" type="button">Annuler</button></div>'}
+  else if(t.id==="del-yes"){acct={name:"",last:"",favs:[],plans:[],alerts:[],seen:[],ratings:{},later:[]};try{localStorage.removeItem("chariot-compte")}catch(err){}if(window.chariotSync)window.chariotSync();render();toast("Espace supprimé")}
   else if(t.id==="del-no")render();
   else if(t.dataset.tab){state.tab=t.dataset.tab;render();window.scrollTo(0,0)}
   else if(t.dataset.seg){state.seg=t.dataset.seg;render()}
@@ -637,7 +682,252 @@ document.addEventListener("submit",e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!sheet.hidden)closeShow()});
 document.addEventListener("input",e=>{if(e.target.id==="q"){state.q=e.target.value;fillSearch()}});
 document.addEventListener("click",e=>{if(e.target.id==="q-clear"){state.q="";const i=document.getElementById("q");if(i){i.value="";i.focus()}fillSearch()}});
+
+// ==== Fonctions de l'appli : alertes « place libérée », agenda, partage, filtres rapides, carnet, avis ====
+const p2=n=>String(n).padStart(2,"0");
+const durMin=s=>{const t=String(s.dur||"");let m=t.match(/(\d+)\s*h\s*(\d+)?/);if(m)return(+m[1])*60+(+(m[2]||0));m=t.match(/(\d+)\s*min/);return m?+m[1]:90};
+const minAge=s=>{const t=String(s.age||"");if(/mois/.test(t))return 0;const m=t.match(/(\d+)/);return m?+m[1]:null};
+const firstFuture=s=>sesOf(s).filter(d=>d>=now).sort((a,b)=>a-b)[0];
+const hasPast=s=>done(s)||sesOf(s).some(d=>d<now);
+const dLabel=d=>{const j=JOURS[d.getDay()];return j[0].toUpperCase()+j.slice(1)+" "+fd(d)+" "+hm(d)};
+// Filtres rapides
+const wkStart=(()=>{const d=today.getDay();return d===6||d===0?today:new Date(today.getFullYear(),today.getMonth(),today.getDate()+(6-d))})();
+const wkEnd=(()=>{const d=wkStart.getDay();return new Date(wkStart.getFullYear(),wkStart.getMonth(),wkStart.getDate()+(d===6?2:1))})();
+const sesIn=(s,a,b)=>sesOf(s).filter(d=>d>=a&&d<b&&d>=now).sort((x,y)=>x-y);
+const QF={
+ today:{label:"Aujourd'hui",txt:"aujourd'hui",empty:"Plus de représentation aujourd'hui.",
+   test:s=>sesIn(s,today,new Date(today.getFullYear(),today.getMonth(),today.getDate()+1)).length>0,
+   when:s=>sesIn(s,today,new Date(today.getFullYear(),today.getMonth(),today.getDate()+1)).map(hm).join(" · ")},
+ weekend:{label:"Ce week-end",txt:"ce week-end",empty:"Pas de représentation ce week-end.",
+   test:s=>sesIn(s,wkStart,wkEnd).length>0, when:s=>sesIn(s,wkStart,wkEnd).map(dLabel).join(" · ")},
+ kids:{label:"Pour les enfants",txt:"pour les enfants (jusqu'à 8 ans)",empty:"Aucun spectacle jeune public à venir pour le moment.",
+   test:s=>{const a=minAge(s);return a!==null&&a<=8&&!!firstFuture(s)}},
+ short:{label:"1h ou moins",txt:"de 1h ou moins",empty:"Aucun spectacle court à venir pour le moment.",
+   test:s=>durMin(s)<=60&&!!firstFuture(s)}
+};
+// Partage (lien direct vers la fiche dans l'appli installée, sinon vers la fiche du site)
+const shareUrl=s=>/github\.io$/.test(location.hostname)?location.origin+location.pathname+"?s="+s.id:SITE+s.url;
+async function shareShow(s){
+  const url=shareUrl(s), text=`${s.t} au Théâtre du Chariot`+(firstFuture(s)?` · ${dLabel(firstFuture(s))}`:"");
+  try{if(navigator.share){await navigator.share({title:s.t,text,url});return}}catch(e){if(e&&e.name==="AbortError")return}
+  try{await navigator.clipboard.writeText(text+" — "+url);toast("Lien copié : collez-le dans un message")}catch(e){toast("Partage impossible ici")}
+}
+// Agenda
+// Fichier agenda (.ics) : seulement hors de claude.ai, qui ne permet pas ce téléchargement
+const ICS_OK=/github\.io$/.test(location.hostname)||location.hostname==="localhost";
+const ADDR="Théâtre du Chariot, 77 rue de Montreuil, 75011 Paris";
+const stamp=d=>`${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}T${p2(d.getHours())}${p2(d.getMinutes())}00`;
+const icsEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/[,;]/g,m=>"\\"+m).replace(/\n/g,"\\n");
+function gcalUrl(s,x){const st=sesDate(x),en=new Date(st.getTime()+durMin(s)*60000);
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(s.t+" – Théâtre du Chariot")+"&dates="+stamp(st)+"/"+stamp(en)+"&ctz=Europe/Paris&location="+encodeURIComponent(ADDR)+"&details="+encodeURIComponent((s.by?s.by+". ":"")+"Billets : "+(s.book||BILLET))}
+function icsFile(s,x){const st=sesDate(x),en=new Date(st.getTime()+durMin(s)*60000),u=new Date();
+  const ut=`${u.getUTCFullYear()}${p2(u.getUTCMonth()+1)}${p2(u.getUTCDate())}T${p2(u.getUTCHours())}${p2(u.getUTCMinutes())}00Z`;
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Theatre du Chariot//Appli//FR","BEGIN:VEVENT",`UID:${s.id}-${x.replace(/\D/g,"")}@theatreduchariot.fr`,`DTSTAMP:${ut}`,
+   `DTSTART;TZID=Europe/Paris:${stamp(st)}`,`DTEND;TZID=Europe/Paris:${stamp(en)}`,`SUMMARY:${icsEsc(s.t+" – Théâtre du Chariot")}`,`LOCATION:${icsEsc(ADDR)}`,
+   `DESCRIPTION:${icsEsc((s.by?s.by+". ":"")+"Billets : "+(s.book||BILLET))}`,"BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:Ce soir au Chariot","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n")}
+function downloadIcs(s,x){
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([icsFile(s,x)],{type:"text/calendar"}));a.download=`chariot-${s.id}-${x.slice(0,5)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Fichier agenda téléchargé : ouvrez-le pour l'ajouter")}
+  catch(e){toast("Téléchargement impossible ici")}
+}
+function agendaBox(s){
+  const fut=(s.sessions||[]).filter(x=>sesDate(x)>=now&&(!isFull(s,x)||acct.plans.includes(planKey(s.id,x))));if(!fut.length)return "";
+  const mine=fut.filter(x=>acct.plans.includes(planKey(s.id,x))), sel=mine[0]||fut[0];
+  const opts=fut.map(x=>`<option value="${x}" ${x===sel?"selected":""}>${dLabel(sesDate(x))}${acct.plans.includes(planKey(s.id,x))?" · J'y vais":""}</option>`).join("");
+  return `<div class="card"><span class="label">Ajouter à mon agenda</span><label class="sr" for="ag-ses">Séance</label><select class="select" id="ag-ses" data-sid="${s.id}">${opts}</select>
+   ${ICS_OK?`<div class="row2"><a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a><button class="btn ghost" type="button" data-ics="${s.id}">iPhone / Outlook</button></div>`:`<a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a><p class="small" style="margin:0">Dans l'appli installée, un second bouton ajoute aussi la séance à l'agenda de l'iPhone ou d'Outlook.</p>`}</div>`;
+}
+// Carnet de spectateur
+const seenIds=()=>{const set=new Set(acct.seen);acct.plans.forEach(k=>{const[id,x]=k.split("|");if(x&&sesDate(x)<now&&SHOWS.some(z=>z.id===id))set.add(id)});return [...set].filter(id=>SHOWS.some(z=>z.id===id))};
+const isSeen=id=>seenIds().includes(id);
+const BADGES=[
+ {i:"🎟️",n:"Premier rideau",d:"1 spectacle vu",ok:v=>v.length>=1},
+ {i:"🎭",n:"Habitué·e",d:"5 spectacles vus",ok:v=>v.length>=5},
+ {i:"🏛️",n:"Pilier du Chariot",d:"10 spectacles vus",ok:v=>v.length>=10},
+ {i:"🧭",n:"Curieux·se",d:"3 formes différentes",ok:v=>new Set(v.map(id=>(P(id).f||[])[0]).filter(Boolean)).size>=3},
+ {i:"🧸",n:"Âme d'enfant",d:"1 spectacle jeune public",ok:v=>v.some(id=>(P(id).f||[]).includes("jeune"))},
+ {i:"📅",n:"Fidèle de la saison",d:"3 spectacles cette saison",ok:v=>v.filter(id=>{const s=SHOWS.find(z=>z.id===id);return s&&!s.arch}).length>=3},
+ {i:"✍️",n:"Critique",d:"3 avis donnés",ok:()=>Object.keys(acct.ratings).length>=3}
+];
+const starsRO=n=>`<span class="stars-ro" aria-label="${n} sur 5">${"★".repeat(n)}${"☆".repeat(5-n)}</span>`;
+function carnetHTML(){
+  const v=seenIds(), got=BADGES.filter(b=>b.ok(v)).length;
+  const list=v.map(id=>SHOWS.find(z=>z.id===id)).map(s=>`<button class="seen-row" data-show="${s.id}"><span><b>${esc(s.t)}</b><span class="small" style="display:block">${acct.ratings[s.id]?starsRO(acct.ratings[s.id].n):"Pas encore d'avis"}</span></span><span class="small">›</span></button>`).join("");
+  return `<section class="card"><span class="label">Mon carnet de spectateur</span>
+   <div style="display:flex;align-items:baseline;gap:10px"><span class="big">${v.length}</span><span>spectacle${v.length>1?"s":""} vu${v.length>1?"s":""} au Chariot · ${got}/${BADGES.length} badges</span></div>
+   <div class="badges">${BADGES.map(b=>`<div class="badge ${b.ok(v)?"":"off"}"><span class="i" aria-hidden="true">${b.i}</span><b>${b.n}</b><span>${b.d}</span></div>`).join("")}</div>
+   ${list||'<p class="small">Les séances « J\'y vais » passées s\'ajoutent toutes seules. Pour un spectacle déjà vu, touchez « Je l\'ai vu » dans sa fiche (même dans les archives).</p>'}
+  </section>`;
+}
+// Avis « Vous avez aimé ? »
+const tmpRate={};
+function rateBox(id){
+  const r=acct.ratings[id]||{}, n=tmpRate[id]||r.n||0;
+  return `<div class="rate stack" style="gap:10px"><div class="stars" role="group" aria-label="Votre note">${[1,2,3,4,5].map(k=>`<button type="button" data-rate="${id}|${k}" aria-pressed="${k<=n}" aria-label="${k} sur 5">★</button>`).join("")}</div>
+   <label class="sr" for="rv-${id}">Votre avis</label><textarea id="rv-${id}" maxlength="500" placeholder="Un mot pour l'équipe et la compagnie (facultatif)">${esc(r.txt||"")}</textarea>
+   <div class="row-act"><button class="btn" type="button" data-rsave="${id}">${r.n?"Modifier mon avis":"Envoyer mon avis"}</button></div>
+   <p class="small" style="margin:0">${r.n?"Merci ! ":""}Votre avis est transmis au théâtre et à la compagnie, sans votre nom.</p></div>`;
+}
+function pendingReview(){
+  const lim=new Date(now.getTime()-45*864e5);
+  return acct.plans.map(k=>{const[id,x]=k.split("|");const s=SHOWS.find(z=>z.id===id);if(!s||!x)return null;const dt=sesDate(x);return{s,dt,end:new Date(dt.getTime()+durMin(s)*60000)}})
+   .filter(o=>o&&o.end<now&&o.dt>lim&&!acct.ratings[o.s.id]&&!acct.later.includes(o.s.id)).sort((a,b)=>b.dt-a.dt)[0]||null;
+}
+// Alertes « place libérée »
+const freed=()=>acct.alerts.map(k=>{const[id,x]=k.split("|");const s=SHOWS.find(z=>z.id===id);return s&&x&&sesDate(x)>now&&!isFull(s,x)?{s,x,k}:null}).filter(Boolean);
+function alertsHTML(){
+  const w=acct.alerts.map(k=>{const[id,x]=k.split("|");const s=SHOWS.find(z=>z.id===id);return s&&x&&sesDate(x)>now?{s,x,k}:null}).filter(Boolean);
+  if(!w.length)return "";
+  return `<section class="card"><span class="label">Mes alertes « place libérée »</span>${w.map(o=>`<div class="plan" style="cursor:default"><span><b>${esc(o.s.t)}</b><span class="small">${dLabel(sesDate(o.x))} · ${isFull(o.s,o.x)?"toujours complet":"<b class=\"aff\">place disponible !</b>"}</span></span><button class="btn ghost" type="button" data-unalert="${o.k}" style="padding:6px 10px">Retirer</button></div>`).join("")}
+   <p class="small">Vous serez prévenu·e dès qu'une place se libère sur ces séances.</p></section>`;
+}
+function noticesHTML(compact){
+  if(!hasAcct())return "";
+  let h="";
+  freed().forEach(o=>{h+=`<section class="card notice"><span class="label">Une place s'est libérée !</span><h3>${esc(o.s.t)}</h3><p class="small">${dLabel(sesDate(o.x))} : la séance n'est plus complète. Réservez vite !</p><div class="row-act"><a class="btn" href="${o.s.book||BILLET}" target="_blank" rel="noopener">Réserver</a><button class="btn ghost" type="button" data-unalert="${o.k}">OK</button></div></section>`});
+  const p=pendingReview();
+  if(p)h+=compact?`<section class="card notice"><span class="label">Vous avez aimé ?</span><p>Vous avez vu <b>${esc(p.s.t)}</b>. Donnez votre avis en deux secondes.</p><div class="row-act"><button class="btn" type="button" data-tab="compte">Donner mon avis</button><button class="btn ghost" type="button" data-rlater="${p.s.id}">Plus tard</button></div></section>`
+    :`<section class="card notice"><span class="label">Vous avez aimé ?</span><h3>${esc(p.s.t)}</h3><p class="small">Vu le ${JOURS[p.dt.getDay()]} ${fd(p.dt)}</p>${rateBox(p.s.id)}<button class="btn ghost" type="button" data-rlater="${p.s.id}">Plus tard</button></section>`;
+  return h?(compact?`<div class="stack" style="margin-bottom:14px">${h}</div>`:h):"";
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-alert],[data-unalert],[data-share],[data-ics],[data-seen],[data-rate],[data-rsave],[data-rlater],[data-qf]");if(!t)return;
+  if(t.dataset.qf){state.qf=state.qf===t.dataset.qf?"":t.dataset.qf;fillSearch();return}
+  if(t.dataset.share){const s=SHOWS.find(z=>z.id===t.dataset.share);if(s)shareShow(s);return}
+  if(t.dataset.ics){const s=SHOWS.find(z=>z.id===t.dataset.ics),sel=document.getElementById("ag-ses");if(s&&sel)downloadIcs(s,sel.value);return}
+  if(t.dataset.rate){const[id,n]=t.dataset.rate.split("|");tmpRate[id]=+n;t.parentElement.querySelectorAll("button").forEach((b,i)=>b.setAttribute("aria-pressed",String(i<+n)));return}
+  if(needAccount())return;
+  if(t.dataset.alert){const k=t.dataset.alert,on=acct.alerts.includes(k);acct.alerts=on?acct.alerts.filter(x=>x!==k):[...acct.alerts,k];saveAcct();openShow(openId,true);render();toast(on?"Alerte retirée":"Vous serez prévenu·e si une place se libère")}
+  else if(t.dataset.unalert){acct.alerts=acct.alerts.filter(x=>x!==t.dataset.unalert);saveAcct();render();toast("Alerte retirée")}
+  else if(t.dataset.seen){const id=t.dataset.seen,auto=acct.plans.some(k=>{const[i,x]=k.split("|");return i===id&&x&&sesDate(x)<now});
+    if(isSeen(id)&&auto){toast("Vu grâce à votre « J'y vais »");return}
+    acct.seen=isSeen(id)?acct.seen.filter(x=>x!==id):[...acct.seen,id];saveAcct();openShow(id,true);render();toast(isSeen(id)?"Ajouté à votre carnet":"Retiré de votre carnet")}
+  else if(t.dataset.rsave){const id=t.dataset.rsave,n=tmpRate[id]||(acct.ratings[id]||{}).n||0;if(!n){toast("Choisissez d'abord une note");return}
+    const tx=(document.getElementById("rv-"+id)||{}).value||"";acct.ratings={...acct.ratings,[id]:{n,txt:tx.trim().slice(0,500),at:Date.now()}};delete tmpRate[id];saveAcct();render();if(!sheet.hidden&&openId)openShow(openId,true);toast("Merci pour votre avis !")}
+  else if(t.dataset.rlater){acct.later=[...acct.later,t.dataset.rlater];saveAcct();render();toast("D'accord, plus tard")}
+});
+document.addEventListener("change",e=>{if(e.target.id==="ag-ses"){const s=SHOWS.find(z=>z.id===e.target.dataset.sid),a=document.getElementById("ag-g");if(s&&a)a.href=gcalUrl(s,e.target.value)}});
+
+// ==== Sortir à plusieurs, compte à rebours, « Surprenez-moi », bilan de saison ====
+const dayDiff=dt=>Math.round((new Date(dt.getFullYear(),dt.getMonth(),dt.getDate())-today)/864e5);
+const myNext=s=>(s.sessions||[]).filter(x=>sesDate(x)>=now&&acct.plans.includes(planKey(s.id,x))).sort()[0]||"";
+const outings=()=>acct.plans.map(k=>{const[id,x]=k.split("|");const s=SHOWS.find(z=>z.id===id);return s&&x?{s,x,dt:sesDate(x)}:null}).filter(o=>o&&o.dt>=now).sort((a,b)=>a.dt-b.dt);
+function countdownHTML(){
+  const o=outings()[0];if(!o)return "";const n=dayDiff(o.dt);
+  const big=n<=0?"Jour J":`J-${n}`, txt=n<=0?(o.dt.getHours()>=18?"C'est ce soir !":"C'est aujourd'hui !"):n===1?"C'est demain !":`Plus que ${n} jours`;
+  return `<section class="card notice"><span class="label">Ma prochaine sortie</span><div class="cd-row"><span class="cd-big">${big}</span><span><b>${esc(o.s.t)}</b><span class="small" style="display:block">${dLabel(o.dt)} · ${txt}</span></span></div>
+   <div class="row-act"><button class="btn" type="button" data-invite="${o.s.id}|${o.x}">👥 Inviter des amis</button><button class="btn ghost" type="button" data-show="${o.s.id}">Voir la fiche</button></div></section>`;
+}
+// Sortir à plusieurs : un lien d'invitation qui ouvre l'appli sur la séance
+const APP_URL=/github\.io$/.test(location.hostname)?location.origin+location.pathname:"https://theatreduchariot.github.io/";
+const inviteUrl=(id,x)=>APP_URL+"?inv="+encodeURIComponent(id+"|"+x)+(acct.name?"&de="+encodeURIComponent(acct.name):"");
+async function shareText(title,text,url){
+  try{if(navigator.share){await navigator.share({title,text,url});return true}}catch(e){if(e&&e.name==="AbortError")return false}
+  try{await navigator.clipboard.writeText(text+(url?" "+url:""));toast("Message copié : collez-le dans WhatsApp ou un SMS");return true}catch(e){toast("Partage impossible ici");return false}
+}
+function invite(id,x){
+  const s=SHOWS.find(z=>z.id===id);if(!s)return;
+  shareText(s.t,`Je vais voir « ${s.t} » au Théâtre du Chariot, ${dLabel(sesDate(x)).toLowerCase()}. Tu viens avec moi ? 🎭`,inviteUrl(id,x));
+  if(!/github\.io$/.test(location.hostname))setTimeout(()=>toast("Aperçu : touchez « Voir ce que reçoivent mes amis » dans Mon espace"),1800);
+}
+let inv=null;
+function openInvite(id,x,de){
+  const s=SHOWS.find(z=>z.id===id);if(!s||!x)return;inv={id,x,de:(de||"").slice(0,40)};
+  const dt=sesDate(x),k=planKey(id,x),going=acct.plans.includes(k),past=dt<now,full=isFull(s,x);
+  const box=document.getElementById("invite");
+  box.innerHTML=`<div class="welcome-box"><span class="label">${inv.de?esc(inv.de)+" vous invite":"Une invitation pour vous"}</span>
+   <h2 id="inv-title">${esc(s.t)}</h2><p><b>${dLabel(dt)}</b><br><span class="small">Théâtre du Chariot · 77 rue de Montreuil, Paris 11e</span></p>
+   <p class="small">${esc(s.d.length>180?s.d.slice(0,179)+"…":s.d)}</p>
+   ${past?`<p class="warn">Cette séance est déjà passée.</p>`:full&&!going?`<p class="warn">Cette séance est complète. Regardez les autres dates dans la fiche.</p>`:""}
+   ${going?`<p><b class="aff">✓ C'est noté, vous y allez aussi !</b></p><button class="btn" type="button" data-inv-reply="1">Répondre à ${esc(inv.de||"mon ami·e")}</button><a class="btn ghost" href="${s.book||BILLET}" target="_blank" rel="noopener">Réserver ma place</a>`
+     :past||full?"":hasAcct()?`<button class="btn" type="button" data-inv-go="1">J'y vais aussi</button>`
+     :`<form id="inv-form" class="stack" style="gap:8px"><span class="small">Indiquez votre prénom et votre nom pour noter la sortie (ils restent sur ce téléphone).</span><input class="select" name="name" required maxlength="40" placeholder="Prénom" autocomplete="given-name"><input class="select" name="last" required maxlength="60" placeholder="Nom" autocomplete="family-name"><button class="btn" type="submit">J'y vais aussi</button></form>`}
+   <button class="btn ghost" type="button" data-show="${s.id}" data-inv-close="1">Voir le spectacle</button>
+   <button class="btn ghost" type="button" data-inv-close="1">Fermer</button></div>`;
+  box.hidden=false;document.body.style.overflow="hidden";
+}
+function closeInvite(){const b=document.getElementById("invite");b.hidden=true;document.body.style.overflow=""}
+function goInvite(){if(!inv)return;const k=planKey(inv.id,inv.x);if(!acct.plans.includes(k)){acct.plans=[...acct.plans,k];saveAcct()}render();openInvite(inv.id,inv.x,inv.de);toast("Séance ajoutée à Mon espace")}
+// « Surprenez-moi » : un spectacle à venir pas encore vu, plutôt proche de vos goûts
+let lastSurprise="";
+function surprise(){
+  const seen=new Set(seenIds()),ok=s=>!done(s)&&(s.sessions||[]).some(x=>sesDate(x)>=now&&!isFull(s,x));
+  let pool=SHOWS.filter(s=>ok(s)&&!seen.has(s.id)&&!myNext(s));if(pool.length>1)pool=pool.filter(s=>s.id!==lastSurprise);
+  if(!pool.length)pool=SHOWS.filter(ok);if(!pool.length){toast("Pas de spectacle à venir pour le moment");return}
+  const w=pool.map(s=>{let b=1,why=null;acct.favs.forEach(f=>{if(f===s.id)return;const r=score(f,s.id);if(okReco(r)&&1+r.pct/25>b){b=1+r.pct/25;why={r,f}}});return{s,b,why}});
+  let t=Math.random()*w.reduce((a,o)=>a+o.b,0),pick=w[0];for(const o of w){t-=o.b;if(t<=0){pick=o;break}}
+  lastSurprise=pick.s.id;openShow(pick.s.id);
+  const f=pick.why&&SHOWS.find(z=>z.id===pick.why.f), nx=(pick.s.sessions||[]).filter(x=>sesDate(x)>=now&&!isFull(pick.s,x)).sort()[0];
+  document.getElementById("close").insertAdjacentHTML("afterend",`<section class="card notice"><span class="label">🎲 Notre suggestion surprise</span><p class="small">${f?esc(whyText(f,pick.why.r)):"Un spectacle que vous n'avez pas encore vu."}${nx?` Prochaine date : ${dLabel(sesDate(nx))}.`:""}</p><div class="row-act"><button class="btn ghost" type="button" data-surprise="1">Une autre idée</button></div></section>`);
+}
+// Bilan de saison
+const SEASON="2026–27";
+function bilanData(){
+  const v=seenIds().map(id=>SHOWS.find(z=>z.id===id)).filter(s=>s&&!s.arch);
+  const min=v.reduce((a,s)=>a+durMin(s),0);
+  const rated=v.filter(s=>acct.ratings[s.id]).sort((a,b)=>acct.ratings[b.id].n-acct.ratings[a.id].n||(acct.ratings[b.id].at||0)-(acct.ratings[a.id].at||0));
+  const cnt={};v.forEach(s=>{const f=(P(s.id).f||[])[0];if(f)cnt[f]=(cnt[f]||0)+1});
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  return{v,min,coeur:rated[0]||null,forme:top?FORMATS[top[0]]||top[0]:"",badges:BADGES.filter(b=>b.ok(seenIds())).length};
+}
+const hFmt=m=>m>=60?`${Math.floor(m/60)}h${m%60?String(m%60).padStart(2,"0"):""}`:`${m} min`;
+function bilanHTML(){
+  const d=bilanData();
+  return `<section class="card"><span class="label">Ma saison ${SEASON} · bilan provisoire</span>
+   ${d.v.length?`<div class="stat-grid"><div class="stat"><b>${d.v.length}</b><span>spectacle${d.v.length>1?"s":""} vu${d.v.length>1?"s":""}</span></div><div class="stat"><b>${hFmt(d.min)}</b><span>de spectacle</span></div>
+    <div class="stat"><b>${d.coeur?esc(d.coeur.t):"—"}</b><span>coup de cœur</span></div><div class="stat"><b>${d.forme?esc(d.forme):"—"}</b><span>forme préférée</span></div></div>
+    <div id="bilan-out" class="stack" style="gap:8px"></div><button class="btn" type="button" data-bilan="1">Créer mon image à partager</button>`
+   :'<p class="small">Dès votre premier spectacle de la saison, votre bilan apparaîtra ici, avec une image à partager sur Instagram.</p>'}
+   ${outings().length?`<button class="btn ghost" type="button" data-inv-demo="1">Voir ce que reçoivent mes amis</button>`:""}
+  </section>`;
+}
+function wrapText(c,text,x,y,maxW,lh,maxLines){
+  const words=String(text).split(" ");let line="",n=0;
+  for(let i=0;i<words.length;i++){const test=line?line+" "+words[i]:words[i];
+    if(c.measureText(test).width>maxW&&line){if(n===maxLines-1){while(c.measureText(line+"…").width>maxW&&line.includes(" "))line=line.slice(0,line.lastIndexOf(" "));c.fillText(line+"…",x,y+n*lh);return n+1}c.fillText(line,x,y+n*lh);n++;line=words[i]}else line=test}
+  c.fillText(line,x,y+n*lh);return n+1;
+}
+let bilanBlob=null;
+async function makeBilan(){
+  const d=bilanData(),W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;const c=cv.getContext("2d");
+  try{await Promise.all([document.fonts.load('800 100px "Poppins"'),document.fonts.load('600 40px "Montserrat"')])}catch(e){}
+  const F=(w,px,f)=>`${w} ${px}px ${f==="b"?'"Montserrat", sans-serif':'"Poppins", sans-serif'}`;
+  c.fillStyle="#ff00ff";c.fillRect(0,0,W,H);
+  const logo=document.querySelector(".logo");try{if(logo&&logo.complete){const lw=430,lh=lw*logo.naturalHeight/logo.naturalWidth;c.drawImage(logo,80,80,lw,lh)}}catch(e){}
+  c.fillStyle="#000";c.font=F(700,64);c.fillText("ma saison "+SEASON,80,300);
+  c.font=F(800,280);c.fillText(String(d.v.length),70,590);
+  const nw=c.measureText(String(d.v.length)).width;c.font=F(700,58);c.fillText(d.v.length>1?"spectacles":"spectacle",100+nw,500);c.fillText(d.v.length>1?"vus":"vu",100+nw,570);
+  c.fillStyle="#fff";c.fillRect(80,660,W-160,4);c.fillStyle="#000";
+  const cells=[["Temps en salle",hFmt(d.min)],["Coup de cœur",d.coeur?d.coeur.t:"—"],["Forme préférée",d.forme||"—"],["Badges",`${d.badges} sur ${BADGES.length}`]];
+  cells.forEach(([lab,val],i)=>{const x=80+(i%2)*470,y=750+Math.floor(i/2)*230;c.font=F(600,30,"b");c.fillText(lab.toUpperCase(),x,y);c.font=F(700,50);wrapText(c,val,x,y+66,420,58,2)});
+  c.font=F(600,30,"b");c.fillText("Théâtre du Chariot · 77 rue de Montreuil, Paris 11e",80,H-110);c.fillText("theatreduchariot.github.io",80,H-66);
+  bilanBlob=await new Promise(r=>cv.toBlob(r,"image/png"));
+  const out=document.getElementById("bilan-out");if(out)out.innerHTML=`<img class="bilan-img" alt="Mon bilan de saison au Théâtre du Chariot" src="${cv.toDataURL("image/png")}"><button class="btn" type="button" data-bilan-share="1">Partager mon image</button><p class="small" style="margin:0;text-align:center">Ou faites un appui long sur l'image pour l'enregistrer.</p>`;
+  const b=document.querySelector("[data-bilan]");if(b)b.remove();
+}
+async function shareBilan(){
+  if(!bilanBlob)return;const file=new File([bilanBlob],"ma-saison-chariot.png",{type:"image/png"});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Ma saison au Chariot"});return}}catch(e){if(e&&e.name==="AbortError")return}
+  try{const dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;
+    if(dl){try{await dl.save({filename:"ma-saison-chariot.png",data:bilanBlob});toast("Image enregistrée")}catch(e){if(!e||e.code!=="declined")toast("Enregistrement impossible ici")}return}}catch(e){}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(bilanBlob);a.download="ma-saison-chariot.png";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}catch(e){toast("Faites un appui long sur l'image pour l'enregistrer")}
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-invite],[data-inv-go],[data-inv-reply],[data-inv-close],[data-inv-demo],[data-surprise],[data-bilan],[data-bilan-share]");if(!t)return;
+  if(t.dataset.invClose)closeInvite();
+  if(t.dataset.surprise)surprise();
+  else if(t.dataset.invite){if(needAccount())return;const[id,x]=t.dataset.invite.split("|");invite(id,x)}
+  else if(t.dataset.invDemo){const o=outings()[0];if(o)openInvite(o.s.id,o.x,acct.name)}
+  else if(t.dataset.invGo)goInvite();
+  else if(t.dataset.invReply&&inv){const s=SHOWS.find(z=>z.id===inv.id);shareText(s.t,`Je viens aussi voir « ${s.t} », ${dLabel(sesDate(inv.x)).toLowerCase()} ! 🎭`,"")}
+  else if(t.dataset.bilan)makeBilan();
+  else if(t.dataset.bilanShare)shareBilan();
+});
+document.addEventListener("submit",e=>{if(e.target.id!=="inv-form")return;e.preventDefault();e.stopImmediatePropagation();
+  const f=e.target,v=(f.elements.name.value||"").trim(),l=(f.elements.last.value||"").trim();if(!v||!l)return;acct.name=v;acct.last=l;saveAcct();goInvite()},true);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("invite").hidden)closeInvite()});
 render();
+// Lien direct vers une fiche (?s=identifiant), utilisé par le bouton Partager
+(function(){try{const q=new URLSearchParams(location.search),id=q.get("s"),iv=q.get("inv");if(id&&SHOWS.some(x=>x.id===id))openShow(id);if(iv){const[i,x]=iv.split("|");openInvite(i,x,q.get("de")||"")}}catch(e){}})();
 // Message d'accueil affiché à la première ouverture
 (function(){
   let seen=false;try{seen=localStorage.getItem("chariot-bienvenue")==="1"}catch(e){}

@@ -91,30 +91,33 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
     $("status").textContent="Chargement…";
     try{
       const snap=await getDocs(collection(db,"votes"));
-      const stats={};SHOWS.forEach(s=>stats[s.id]={favs:0,go:new Set(),ses:{}});
+      const stats={};SHOWS.forEach(s=>stats[s.id]={favs:0,go:new Set(),ses:{},notes:[],txt:[]});
       let people=0,active=0;
       snap.forEach(d=>{
         const v=d.data();people++;
         if((v.favs||[]).length||(v.plans||[]).length)active++;
         (v.favs||[]).forEach(id=>{if(stats[id])stats[id].favs++});
+        Object.entries(v.ratings||{}).forEach(([id,o])=>{if(!stats[id]||!o||!(o.n>=1&&o.n<=5))return;stats[id].notes.push(o.n);if(o.txt)stats[id].txt.push({n:o.n,t:String(o.txt).slice(0,500)})});
         (v.plans||[]).forEach(k=>{const[id,x]=k.split("|");if(!stats[id])return;stats[id].go.add(d.id);stats[id].ses[x]=(stats[id].ses[x]||0)+1});
       });
-      const rows=SHOWS.map(s=>({s,f:stats[s.id].favs,g:stats[s.id].go.size,ses:stats[s.id].ses})).sort((a,b)=>(b.f+b.g)-(a.f+a.g));
+      const rows=SHOWS.map(s=>({s,f:stats[s.id].favs,g:stats[s.id].go.size,ses:stats[s.id].ses,notes:stats[s.id].notes,txt:stats[s.id].txt})).sort((a,b)=>(b.f+b.g)-(a.f+a.g));
       const max=Math.max(1,...rows.map(r=>Math.max(r.f,r.g)));
       const totF=rows.reduce((a,r)=>a+r.f,0),totG=rows.reduce((a,r)=>a+Object.values(r.ses).reduce((x,y)=>x+y,0),0);
       $("out").innerHTML=`<div class="kpis">
         <div class="card kpi"><span class="label">Espaces créés</span><b>${people}</b></div>
         <div class="card kpi"><span class="label">Espaces actifs</span><b>${active}</b></div>
         <div class="card kpi"><span class="label">Favoris au total</span><b>${totF}</b></div>
-        <div class="card kpi"><span class="label">« J'y vais » au total</span><b>${totG}</b></div></div>
+        <div class="card kpi"><span class="label">« J'y vais » au total</span><b>${totG}</b></div>
+        <div class="card kpi"><span class="label">Avis reçus</span><b>${rows.reduce((a,r)=>a+r.notes.length,0)}</b></div></div>
       <div class="card"><h2>Par spectacle</h2><div class="scroll"><table>
-        <thead><tr><th>Spectacle</th><th class="n">Favoris</th><th class="n">Personnes « J'y vais »</th></tr></thead><tbody>
+        <thead><tr><th>Spectacle</th><th class="n">Favoris</th><th class="n">Personnes « J'y vais »</th><th class="n">Avis</th></tr></thead><tbody>
         ${rows.map(r=>{const det=Object.entries(r.ses).sort(([a],[b])=>a.localeCompare(b));return `<tr><td><b>${esc(r.s.t)}</b>
           <div class="bar" style="width:${Math.round(100*Math.max(r.f,r.g)/max)}%"></div>
+          ${r.txt.length?`<details><summary>Commentaires du public (${r.txt.length})</summary><ul>${r.txt.map(o=>`<li>${"★".repeat(o.n)} ${esc(o.t)}</li>`).join("")}</ul></details>`:""}
           ${det.length?`<details><summary>Détail par séance</summary><ul>${det.map(([x,n])=>`<li>${label(x)} : ${n}</li>`).join("")}</ul></details>`:""}</td>
-          <td class="n">${r.f}</td><td class="n">${r.g}</td></tr>`}).join("")}
+          <td class="n">${r.f}</td><td class="n">${r.g}</td><td class="n">${r.notes.length?(r.notes.reduce((a,b)=>a+b,0)/r.notes.length).toFixed(1).replace(".",",")+" ★ <span class=\"muted\" style=\"font-weight:400\">("+r.notes.length+")</span>":"—"}</td></tr>`}).join("")}
         </tbody></table></div></div>
-      <p class="muted">Chiffres anonymes. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
+      <p class="muted">Chiffres et avis anonymes : les commentaires peuvent être transmis aux compagnies. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
       $("status").textContent="Mis à jour le "+new Date().toLocaleString("fr-FR");
     }catch(e){
       const em=(auth.currentUser&&auth.currentUser.email)||"?";$("out").innerHTML=e.code==="permission-denied"?`<p class="err">Accès refusé : l'adresse <b>${esc(em)}</b> n'est pas autorisée dans les règles Firestore. Déconnectez-vous et reconnectez-vous avec l'adresse administrateur, ou ajoutez cette adresse dans Firestore &gt; Règles (ligne request.auth.token.email), puis cliquez sur Publier.</p>`:`<p class="err">Erreur : ${esc(e.message)}</p>`;

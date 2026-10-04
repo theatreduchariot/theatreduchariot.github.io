@@ -81,6 +81,15 @@ export function plan({ SHOWS, Y, state, tokens, now }) {
           (left.length ? `Il reste des places le ${listFr(left.map(x => fmtSes(Y, x)))}.` : "Toutes les séances sont maintenant complètes."))
       });
     }
+    // 3 bis. Place libérée : la mention « complet » a disparu → ceux qui ont demandé à être prévenus
+    for (const s of SHOWS) {
+      if (!old[s.id]) continue;
+      const freed = old[s.id].full.filter(x => future(x) && s.sessions.includes(x) && !(s.full || []).includes(x));
+      for (const x of freed) {
+        const k = s.id + "|" + x, who = tokens.filter(t => (t.alerts || []).includes(k)).map(t => t.token);
+        if (who.length) messages.push({ to: who, title: `${s.t} : une place s'est libérée !`, body: `La séance du ${fmtSes(Y, x)} n'est plus complète. Réservez vite dans l'appli !` });
+      }
+    }
   }
 
   // 4. Chaque matin (entre 9h et 20h, une seule fois par jour) : rappel « demain »
@@ -95,6 +104,16 @@ export function plan({ SHOWS, Y, state, tokens, now }) {
         to: [t.token], title: `Demain ${fmtTime(ses(Y, x).time)} : ${s.t}`,
         body: mine.length > 1 ? `Et aussi ${listFr(mine.slice(1).map(([i, y]) => `${byId[i].t} à ${fmtTime(ses(Y, y).time)}`))}. À demain au Chariot, 77 rue de Montreuil !` : "À demain au Théâtre du Chariot, 77 rue de Montreuil (Paris 11e) !"
       });
+    }
+    // 4 bis. Dernières dates : un spectacle (plus de 2 séances au total) dont il ne reste que 1 ou 2 séances
+    // avec des places → une seule fois par spectacle, à tous sauf ceux qui y vont déjà.
+    next.lastCall = { ...(next.lastCall || {}) };
+    const lastCalls = SHOWS.filter(s => s.sessions.length > 2 && !next.lastCall[s.id]).map(s => ({ s, left: s.sessions.filter(x => future(x)).sort(), open: s.sessions.filter(x => future(x) && !(s.full || []).includes(x)).sort() }))
+      .filter(o => o.left.length >= 1 && o.left.length <= 2 && o.open.length);
+    for (const o of lastCalls) {
+      next.lastCall[o.s.id] = today;
+      const who = tokens.filter(t => !(t.plans || []).some(k => k.startsWith(o.s.id + "|"))).map(t => t.token);
+      if (who.length) messages.push({ to: who, title: `Dernières dates pour ${o.s.t} !`, body: cut(o.left.length === 1 ? `Dernière représentation le ${fmtSes(Y, o.left[0])}. Ne la manquez pas !` : `Plus que deux représentations : ${listFr(o.left.map(x => fmtSes(Y, x)))}. Ne les manquez pas !`) });
     }
     // 5. Le lundi : récap de la semaine (aujourd'hui → lundi prochain inclus, comme « À l'affiche »)
     if (now.weekday === 1 && next.lastWeekly !== today) {

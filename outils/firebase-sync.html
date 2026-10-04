@@ -14,12 +14,14 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
     const push=async()=>{
       if(!uid)return;
       const st=window.chariotState?window.chariotState():null;
-      try{ if(st) await setDoc(doc(db,"votes",uid),{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(doc(db,"votes",uid)); }
+      // Si les règles Firestore n'acceptent pas encore les avis/alertes, on renvoie sans ces champs.
+      const put=async(name,full,base)=>{try{await setDoc(doc(db,name,uid),full)}catch(e){if(e&&e.code==="permission-denied"){await setDoc(doc(db,name,uid),base)}else throw e}};
+      try{ if(st) await put("votes",{favs:st.favs,plans:st.plans,ratings:st.ratings||{},updatedAt:serverTimestamp()},{favs:st.favs,plans:st.plans,updatedAt:serverTimestamp()}); else await deleteDoc(doc(db,"votes",uid)); }
       catch(e){console.warn("Envoi impossible",e)}
       const tk=window.chariotToken;
       if(tk){
         const L=window.chariotLog||(()=>{});
-        try{ await setDoc(doc(db,"tokens",uid),{token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}); L("Abonnement enregistré dans Firestore"); }
+        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[]},b); L("Abonnement enregistré dans Firestore"); }
         catch(e){console.warn("Abonnement aux notifications non enregistré",e);L("Erreur Firestore : "+(e.code||"")+" "+e.message)}
       }
     };

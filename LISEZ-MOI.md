@@ -92,9 +92,11 @@ Programme : `outils/notifier.mjs`, lancé par `.github/workflows/notifs.yml` (Gi
 - **À chaque mise à jour du programme** (synchro horaire) :
   - nouveau spectacle → à tous les abonnés ;
   - nouvelles dates → à tous les abonnés ;
-  - séance devenue complète → aux abonnés qui ont ce spectacle en favori.
+  - séance devenue complète → aux abonnés qui ont ce spectacle en favori ;
+  - place libérée (la mention COMPLET disparaît) → à ceux qui ont activé l'alerte sur cette séance.
 - **Chaque matin vers 10h** :
   - rappel « Demain 16h : … » pour les séances marquées « J'y vais » ;
+  - « Dernières dates pour… » quand il ne reste qu'une ou deux représentations d'un spectacle (une fois par spectacle, sauf à ceux qui y vont déjà) ;
   - le lundi, le récap des spectacles de la semaine, envoyé à tous.
 
 Chaque téléphone qui active les notifications enregistre anonymement, dans Firestore (collection `tokens`), son adresse de notification, ses favoris et ses « J'y vais ».
