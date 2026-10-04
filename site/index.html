@@ -726,7 +726,7 @@ function icsFile(s,x){const st=sesDate(x),en=new Date(st.getTime()+durMin(s)*600
    `DTSTART;TZID=Europe/Paris:${stamp(st)}`,`DTEND;TZID=Europe/Paris:${stamp(en)}`,`SUMMARY:${icsEsc(s.t+" – Théâtre du Chariot")}`,`LOCATION:${icsEsc(ADDR)}`,
    `DESCRIPTION:${icsEsc((s.by?s.by+". ":"")+"Billets : "+(s.book||BILLET))}`,"BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:Ce soir au Chariot","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n")}
 function downloadIcs(s,x){
-  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([icsFile(s,x)],{type:"text/calendar"}));a.download=`chariot-${s.id}-${x.slice(0,5)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Fichier agenda téléchargé : ouvrez-le pour l'ajouter")}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([icsFile(s,x)],{type:"text/calendar"}));a.download=`chariot-${s.id}-${x.slice(0,5)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast(IS_ANDROID?"Touchez « Ouvrir » puis choisissez Calendrier":"Fichier agenda téléchargé : ouvrez-le pour l'ajouter")}
   catch(e){toast("Téléchargement impossible ici")}
 }
 // Agenda du téléphone : sur Android, ouvre l'appli d'agenda choisie (Calendrier Samsung, Google Agenda…)
@@ -738,7 +738,7 @@ function agendaBox(s){
   const mine=fut.filter(x=>acct.plans.includes(planKey(s.id,x))), sel=mine[0]||fut[0];
   const opts=fut.map(x=>`<option value="${x}" ${x===sel?"selected":""}>${dLabel(sesDate(x))}${acct.plans.includes(planKey(s.id,x))?" · J'y vais":""}</option>`).join("");
   const g=`<a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a>`;
-  const btns=IS_ANDROID?`<a class="btn" id="ag-a" href="${androidCalUrl(s,sel)}">Ajouter au calendrier du téléphone</a>${g}<p class="small" style="margin:0">Le téléphone vous laisse choisir l'appli : Calendrier Samsung, Google Agenda…</p>`
+  const btns=IS_ANDROID&&ICS_OK?`<button class="btn" type="button" data-ics="${s.id}">Ajouter au calendrier du téléphone</button>${g}<p class="small" style="margin:0">Le téléphone télécharge la séance : touchez « Ouvrir » dans la notification de téléchargement, puis choisissez <b>Calendrier</b>.</p>`
     :IS_IOS&&ICS_OK?`<button class="btn" type="button" data-ics="${s.id}">Ajouter au calendrier de l'iPhone</button>${g}`
     :ICS_OK?`<div class="row2">${g}<button class="btn ghost" type="button" data-ics="${s.id}">Outlook / autre (.ics)</button></div>`
     :`${g}<p class="small" style="margin:0">Dans l'appli installée, un bouton ajoute aussi la séance au calendrier du téléphone (Samsung, iPhone…).</p>`;
