@@ -616,18 +616,18 @@ function fillSearch(){
   const box=document.getElementById("search-res"),body=document.getElementById("prog-body");if(!box||!body)return;
   const q=(state.q||"").trim(), f=state.qf||"";
   body.hidden=!!(q||f); const clr=document.getElementById("q-clear"); if(clr)clr.hidden=!q;
-  document.querySelectorAll("[data-qf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.qf===f)));
+  document.querySelectorAll("[data-qf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.qf===f)));const mr=document.getElementById("moods"),mb=document.querySelector("[data-moods]");if(mr){const open=!!state.moodOpen||f.startsWith("m:");mr.hidden=!open;if(mb)mb.setAttribute("aria-expanded",String(open))}
   if(!q&&!f){box.innerHTML="";return}
   let r=q?searchShows(q):SHOWS.filter(s=>!done(s)).sort((a,b)=>(firstFuture(a)||0)-(firstFuture(b)||0));
-  if(f)r=r.filter(QF[f].test);
-  const what=(f?QF[f].txt:"")+(q?` pour « ${esc(q)} »`:"");
-  box.innerHTML=r.length?`<p class="small" style="margin:0 0 10px">${r.length} spectacle${r.length>1?"s":""} ${what}</p><div class="list">${r.map(s=>f&&QF[f].when?`<div>${card(s)}<p class="when-list">${QF[f].when(s)}</p></div>`:card(s)).join("")}</div>`
-    :(f?`<p class="small">${QF[f].empty}${q?` (avec « ${esc(q)} »)`:""}</p>`:`<p class="small">Aucun spectacle ne correspond à « ${esc(q)} ». Essayez un titre, un nom d'artiste, une compagnie ou un thème (ex. « marionnette », « famille »).</p>`);
+  const F=f?(f.startsWith("m:")?MOODS[f.slice(2)]:QF[f]):null;if(F&&F.sort)r=r.filter(F.test).sort(F.sort);else if(F)r=r.filter(F.test);
+  const what=(f?F.txt:"")+(q?` pour « ${esc(q)} »`:"");
+  box.innerHTML=r.length?`<p class="small" style="margin:0 0 10px">${r.length} spectacle${r.length>1?"s":""} ${what}</p><div class="list">${r.map(s=>F&&F.when&&F.when(s)?`<div>${card(s)}<p class="when-list">${F.when(s)}</p></div>`:card(s)).join("")}</div>`
+    :(f?`<p class="small">${F.empty}${q?` (avec « ${esc(q)} »)`:""}</p>`:`<p class="small">Aucun spectacle ne correspond à « ${esc(q)} ». Essayez un titre, un nom d'artiste, une compagnie ou un thème (ex. « marionnette », « famille »).</p>`);
 }
 const _programme=views.programme;
 views.programme=function(){
   const h=_programme(),i=h.indexOf("</p>")+4;
-  const bar=`<div class="search" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><label class="sr" for="q">Rechercher un spectacle</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher un spectacle, un artiste, un thème…" value="${esc(state.q||"")}"><button type="button" id="q-clear" aria-label="Effacer la recherche" ${state.q?"":"hidden"}>×</button></div><div class="qf" role="group" aria-label="Filtres rapides">${Object.entries(QF).map(([k,v])=>`<button type="button" data-qf="${k}" aria-pressed="${state.qf===k}">${v.label}</button>`).join("")}<button type="button" class="surprise" data-surprise="1">🎲 Surprenez-moi</button></div><div id="search-res"></div>`;
+  const bar=`<div class="search" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><label class="sr" for="q">Rechercher un spectacle</label><input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher un spectacle, un artiste, un thème…" value="${esc(state.q||"")}"><button type="button" id="q-clear" aria-label="Effacer la recherche" ${state.q?"":"hidden"}>×</button></div><div class="qf" role="group" aria-label="Filtres rapides">${Object.entries(QF).map(([k,v])=>`<button type="button" data-qf="${k}" aria-pressed="${state.qf===k}">${v.label}</button>`).join("")}<button type="button" class="surprise" data-moods="1" aria-expanded="false">✨ J'ai envie de…</button><button type="button" class="surprise" data-surprise="1">🎲 Surprenez-moi</button></div><div class="qf" id="moods" role="group" aria-label="Envies" hidden>${Object.entries(MOODS).map(([k,v])=>`<button type="button" data-qf="m:${k}" aria-pressed="${state.qf==="m:"+k}">${v.label}</button>`).join("")}</div><div id="search-res"></div>`;
   return h.slice(0,i)+bar+`<div id="prog-body">`+h.slice(i)+`</div>`;
 };
 
@@ -1062,6 +1062,44 @@ function setLang(l){
 })();
 document.documentElement.lang=LANG;
 trNode(document.body);
+
+// ==== « J'ai envie de… » : des spectacles selon l'humeur (à partir des thèmes et formes de chaque spectacle) ====
+const mood=(label,txt,th,f,extra)=>({label,txt,empty:"Rien de prévu dans cette envie pour le moment.",
+  sc:s=>{const p=P(s.id);return (p.th||[]).filter(x=>th.includes(x)).length*1.5+(p.f||[]).filter(x=>f.includes(x)).length+(extra?extra(s):0)},
+  get test(){return s=>!done(s)&&!!firstFuture(s)&&this.sc(s)>0},
+  get sort(){return (a,b)=>this.sc(b)-this.sc(a)||firstFuture(a)-firstFuture(b)},
+  when:s=>{const p=P(s.id);return [...(p.th||[]).filter(x=>th.includes(x)).map(x=>THEMES[x]),...(p.f||[]).filter(x=>f.includes(x)).map(x=>FORMATS[x])].slice(0,3).join(" · ")}});
+const MOODS={
+ rire:mood("😂 Rire","pour rire",["fete","convivialite"],["comedie","interactif"]),
+ emu:mood("🥹 Être ému·e","pour être ému·e",["deuil","amour","rupture","memoire","vieillesse","solitude","parentalite"],["drame","poesie"]),
+ reflechir:mood("🧠 Réfléchir","pour réfléchir",["engagement","femmes","histoire","numerique","soin","identite"],["docu"]),
+ enfants:mood("🧸 Sortir avec les enfants","à voir avec les enfants",[],["jeune"],s=>{const a=minAge(s);return a!==null&&a<=8?2:0}),
+ musique:mood("🎶 Musique et danse","en musique et en danse",[],["musique","danse","concert"]),
+ voyager:mood("🌍 Voyager","pour voyager",["cultures","nature"],[]),
+ rever:mood("✨ Rêver","pour rêver",["reve","creation"],["marionnette","poesie"])
+};
+document.addEventListener("click",e=>{const t=e.target.closest("[data-moods]");if(!t)return;state.moodOpen=!state.moodOpen;if(!state.moodOpen&&(state.qf||"").startsWith("m:"))state.qf="";fillSearch()});
+Object.assign(I18N,{
+ "✨ J'ai envie de…":["✨ I feel like…","✨ Me apetece…","✨ Ich habe Lust auf…","✨ Ho voglia di…","✨ Хочется…"],
+ "Envies":["Moods","Planes","Stimmungen","Voglie","Настроение"],
+ "😂 Rire":["😂 Laughing","😂 Reír","😂 Lachen","😂 Ridere","😂 Посмеяться"],
+ "🥹 Être ému·e":["🥹 Being moved","🥹 Emocionarme","🥹 Berührt werden","🥹 Emozionarmi","🥹 Растрогаться"],
+ "🧠 Réfléchir":["🧠 Thinking","🧠 Reflexionar","🧠 Nachdenken","🧠 Riflettere","🧠 Задуматься"],
+ "🧸 Sortir avec les enfants":["🧸 An outing with kids","🧸 Salir con los niños","🧸 Ausflug mit Kindern","🧸 Uscire con i bambini","🧸 Сходить с детьми"],
+ "🎶 Musique et danse":["🎶 Music and dance","🎶 Música y danza","🎶 Musik und Tanz","🎶 Musica e danza","🎶 Музыка и танец"],
+ "🌍 Voyager":["🌍 Travelling","🌍 Viajar","🌍 Reisen","🌍 Viaggiare","🌍 Путешествовать"],
+ "✨ Rêver":["✨ Dreaming","✨ Soñar","✨ Träumen","✨ Sognare","✨ Помечтать"],
+ "Rien de prévu dans cette envie pour le moment.":["Nothing scheduled for this mood right now.","Nada programado para este plan por ahora.","Gerade nichts Passendes im Programm.","Niente in programma per questa voglia al momento.","Пока ничего подходящего."]
+});
+Object.assign(I18N_SUF,{
+ "pour rire":["to make you laugh","para reír","zum Lachen","per ridere","чтобы посмеяться"],
+ "pour être ému·e":["to move you","para emocionarte","zum Mitfühlen","per emozionarti","чтобы растрогаться"],
+ "pour réfléchir":["to make you think","para reflexionar","zum Nachdenken","per riflettere","чтобы задуматься"],
+ "à voir avec les enfants":["to see with children","para ver con niños","für Kinder","da vedere con i bambini","для похода с детьми"],
+ "en musique et en danse":["with music and dance","con música y danza","mit Musik und Tanz","con musica e danza","с музыкой и танцем"],
+ "pour voyager":["to travel","para viajar","zum Reisen","per viaggiare","чтобы путешествовать"],
+ "pour rêver":["to dream","para soñar","zum Träumen","per sognare","чтобы помечтать"]
+});
 
 render();
 // Lien direct vers une fiche (?s=identifiant), utilisé par le bouton Partager
