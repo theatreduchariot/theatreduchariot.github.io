@@ -30,6 +30,25 @@ def cut(text, start, end_marker):
 def main(src_path):
     src = pathlib.Path(src_path).read_text(encoding="utf-8")
 
+    # Version « gelée » : tant que outils/gel.html existe, la version publique garde le code
+    # (fonctions, textes, style) de ce fichier et ne reprend de l'artefact que le programme
+    # (SITE … SHOWS) et les profils (PROFIL). Sert à tester de nouvelles fonctions sur
+    # l'artefact sans les mettre en ligne. Supprimer outils/gel.html pour tout reprendre.
+    gel = ROOT / "outils" / "gel.html"
+    if gel.exists():
+        frozen = gel.read_text(encoding="utf-8")
+        def block(t, a, b, incl=False):
+            i = t.index(a); j = t.index(b, i) + (len(b) if incl else 0)
+            return i, j
+        i, j = block(src, "const SITE=", "const MOIS=")
+        fi, fj = block(frozen, "const SITE=", "const MOIS=")
+        frozen = frozen[:fi] + src[i:j] + frozen[fj:]
+        i, j = block(src, "const PROFIL={", "\n};", True)
+        fi, fj = block(frozen, "const PROFIL={", "\n};", True)
+        frozen = frozen[:fi] + src[i:j] + frozen[fj:]
+        src = frozen
+        print("Version gelée (outils/gel.html) : seul le programme est mis à jour.")
+
     # 1. Retirer l'enveloppe ajoutée par claude.ai : la page commence à <title>
     body = src[src.index("<title>"):]
     body = re.sub(r"</body>\s*</html>\s*$", "", body.rstrip()) + "\n"
