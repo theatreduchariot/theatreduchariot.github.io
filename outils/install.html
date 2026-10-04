@@ -33,7 +33,9 @@
   const ios=/iphone|ipad|ipod/i.test(ua)||(/macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const mobile=ios||/android/i.test(ua);
   if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
-  if(standalone||!mobile||get())return;
+  // Lien d'installation (…/?installer) : on repropose l'installation même après « Plus tard ».
+  const force=/[?&]installer/.test(location.search);
+  if(standalone||!mobile||(get()&&!force))return;
 
   let deferred=null;
   window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;});
