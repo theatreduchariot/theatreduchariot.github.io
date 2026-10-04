@@ -729,12 +729,20 @@ function downloadIcs(s,x){
   try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([icsFile(s,x)],{type:"text/calendar"}));a.download=`chariot-${s.id}-${x.slice(0,5)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast("Fichier agenda téléchargé : ouvrez-le pour l'ajouter")}
   catch(e){toast("Téléchargement impossible ici")}
 }
+// Agenda du téléphone : sur Android, ouvre l'appli d'agenda choisie (Calendrier Samsung, Google Agenda…)
+const UA=navigator.userAgent, IS_ANDROID=/android/i.test(UA), IS_IOS=/iphone|ipad|ipod/i.test(UA)||(/macintosh/i.test(UA)&&navigator.maxTouchPoints>1);
+function androidCalUrl(s,x){const st=sesDate(x),en=new Date(st.getTime()+durMin(s)*60000),e=encodeURIComponent;
+  return "intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event;S.title="+e(s.t+" – Théâtre du Chariot")+";S.eventLocation="+e(ADDR)+";S.description="+e((s.by?s.by+". ":"")+"Billets : "+(s.book||BILLET))+";l.beginTime="+st.getTime()+";l.endTime="+en.getTime()+";end"}
 function agendaBox(s){
   const fut=(s.sessions||[]).filter(x=>sesDate(x)>=now&&(!isFull(s,x)||acct.plans.includes(planKey(s.id,x))));if(!fut.length)return "";
   const mine=fut.filter(x=>acct.plans.includes(planKey(s.id,x))), sel=mine[0]||fut[0];
   const opts=fut.map(x=>`<option value="${x}" ${x===sel?"selected":""}>${dLabel(sesDate(x))}${acct.plans.includes(planKey(s.id,x))?" · J'y vais":""}</option>`).join("");
-  return `<div class="card"><span class="label">Ajouter à mon agenda</span><label class="sr" for="ag-ses">Séance</label><select class="select" id="ag-ses" data-sid="${s.id}">${opts}</select>
-   ${ICS_OK?`<div class="row2"><a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a><button class="btn ghost" type="button" data-ics="${s.id}">iPhone / Outlook</button></div>`:`<a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a><p class="small" style="margin:0">Dans l'appli installée, un second bouton ajoute aussi la séance à l'agenda de l'iPhone ou d'Outlook.</p>`}</div>`;
+  const g=`<a class="btn ghost" id="ag-g" href="${gcalUrl(s,sel)}" target="_blank" rel="noopener">Google Agenda</a>`;
+  const btns=IS_ANDROID?`<a class="btn" id="ag-a" href="${androidCalUrl(s,sel)}">Ajouter au calendrier du téléphone</a>${g}<p class="small" style="margin:0">Le téléphone vous laisse choisir l'appli : Calendrier Samsung, Google Agenda…</p>`
+    :IS_IOS&&ICS_OK?`<button class="btn" type="button" data-ics="${s.id}">Ajouter au calendrier de l'iPhone</button>${g}`
+    :ICS_OK?`<div class="row2">${g}<button class="btn ghost" type="button" data-ics="${s.id}">Outlook / autre (.ics)</button></div>`
+    :`${g}<p class="small" style="margin:0">Dans l'appli installée, un bouton ajoute aussi la séance au calendrier du téléphone (Samsung, iPhone…).</p>`;
+  return `<div class="card"><span class="label">Ajouter à mon agenda</span><label class="sr" for="ag-ses">Séance</label><select class="select" id="ag-ses" data-sid="${s.id}">${opts}</select>${btns}</div>`;
 }
 // Carnet de spectateur
 const seenIds=()=>{const set=new Set(acct.seen);acct.plans.forEach(k=>{const[id,x]=k.split("|");if(x&&sesDate(x)<now&&SHOWS.some(z=>z.id===id))set.add(id)});return [...set].filter(id=>SHOWS.some(z=>z.id===id))};
@@ -805,7 +813,7 @@ document.addEventListener("click",e=>{
     const tx=(document.getElementById("rv-"+id)||{}).value||"";acct.ratings={...acct.ratings,[id]:{n,txt:tx.trim().slice(0,500),at:Date.now()}};delete tmpRate[id];saveAcct();render();if(!sheet.hidden&&openId)openShow(openId,true);toast("Merci pour votre avis !")}
   else if(t.dataset.rlater){acct.later=[...acct.later,t.dataset.rlater];saveAcct();render();toast("D'accord, plus tard")}
 });
-document.addEventListener("change",e=>{if(e.target.id==="ag-ses"){const s=SHOWS.find(z=>z.id===e.target.dataset.sid),a=document.getElementById("ag-g");if(s&&a)a.href=gcalUrl(s,e.target.value)}});
+document.addEventListener("change",e=>{if(e.target.id==="ag-ses"){const s=SHOWS.find(z=>z.id===e.target.dataset.sid),a=document.getElementById("ag-g");if(s&&a)a.href=gcalUrl(s,e.target.value);const an=document.getElementById("ag-a");if(s&&an)an.href=androidCalUrl(s,e.target.value)}});
 
 // ==== Sortir à plusieurs, compte à rebours, « Surprenez-moi », bilan de saison ====
 const dayDiff=dt=>Math.round((new Date(dt.getFullYear(),dt.getMonth(),dt.getDate())-today)/864e5);
