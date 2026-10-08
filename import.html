@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Import des données · Billetterie</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<style>
+:root{--bg:#f3f0f4;--surface:#fff;--ink:#221a2b;--muted:#6b6175;--line:#ddd6e2;--velvet:#6d1f3c;--ok:#2d7a4f;--warn:#a4501a}
+@media (prefers-color-scheme:dark){:root{--bg:#17121c;--surface:#221b29;--ink:#efe9f2;--muted:#a99fb3;--line:#3a3043;--velvet:#e07a9d;--ok:#6cc895;--warn:#ec9a62;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif;padding:24px 16px}
+main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+h1{margin:0;font-size:1.4rem}
+button{border:0;border-radius:8px;padding:10px 14px;font:600 .95rem system-ui;background:var(--velvet);color:#fff;cursor:pointer;align-self:flex-start}
+button:disabled{opacity:.5;cursor:default}
+.muted{color:var(--muted);font-size:.9rem}
+pre{white-space:pre-wrap;font-size:.85rem;margin:0}
+.ok{color:var(--ok)}.err{color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Importer les données dans Firebase</h1>
+  <p class="muted">À faire une seule fois, au moment de passer à l'application. L'import recopie les spectacles, réservations, clients et tarifs. Un document qui existe déjà avec le même identifiant est remplacé.</p>
+  <div class="card">
+    <b>1. Se connecter</b>
+    <div id="who" class="muted">Non connecté.</div>
+    <button id="login" type="button">Se connecter avec Google</button>
+  </div>
+  <div class="card">
+    <b>2. Choisir le fichier exporté</b>
+    <input type="file" id="file" accept=".json,application/json">
+    <div id="summary" class="muted"></div>
+  </div>
+  <div class="card">
+    <b>3. Lancer l'import</b>
+    <button id="go" type="button" disabled>Importer</button>
+    <pre id="log"></pre>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let data=null;
+firebase.initializeApp(window.FIREBASE_CONFIG);
+const auth=firebase.auth(),fs=firebase.firestore();
+try{fs.settings({ignoreUndefinedProperties:true,merge:true})}catch(_){}
+auth.onAuthStateChanged(u=>{$("who").textContent=u?"Connecté : "+u.email:"Non connecté.";check()});
+$("login").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>log("Connexion impossible : "+e.code,"err"));
+$("file").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{const j=JSON.parse(await f.text());data=j.collections||j;
+    $("summary").textContent=Object.entries(data).map(([k,v])=>k+" : "+Object.keys(v).length).join(" · ");}
+  catch(_){data=null;$("summary").textContent="Ce fichier n'est pas un export valide."}
+  check();
+};
+function check(){$("go").disabled=!(data&&auth.currentUser)}
+function log(t,c){const s=document.createElement("div");s.textContent=t;if(c)s.className=c;$("log").append(s)}
+$("go").onclick=async()=>{
+  $("go").disabled=true;$("log").textContent="";
+  try{
+    for(const[col,docs]of Object.entries(data)){
+      const ids=Object.keys(docs);let n=0;
+      for(let i=0;i<ids.length;i+=400){
+        const b=fs.batch();
+        for(const id of ids.slice(i,i+400))b.set(fs.collection(col).doc(id),docs[id]);
+        await b.commit();n+=Math.min(400,ids.length-i);
+      }
+      log(col+" : "+n+" documents importés","ok");
+    }
+    log("Import terminé. Vous pouvez ouvrir la billetterie.","ok");
+  }catch(e){
+    log(e&&e.code==="permission-denied"?"Refusé : ce compte n'est pas dans la liste de l'équipe (règles Firestore, étape 5).":"Erreur : "+(e&&e.message||e),"err");
+    $("go").disabled=false;
+  }
+};
+</script>
+</body>
+</html>
