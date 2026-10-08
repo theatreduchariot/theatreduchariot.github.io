@@ -198,6 +198,12 @@ nav.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1
 .lang-menu button{border:0;background:none;text-align:left;padding:11px 12px;font:600 15px var(--body);color:var(--ink);border-radius:6px;cursor:pointer}
 .lang-menu button[aria-current="true"]{background:var(--soft)}
 html[lang="fr"] .i18n-note{display:none}
+.chip.new{background:#000;color:#fff;font-weight:700}
+.qr{display:grid;justify-items:center;gap:10px;text-align:center}
+.qr-box{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.14);width:220px;max-width:100%}
+.qr-box svg{display:block;width:100%;height:auto}
+.toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:10px;cursor:pointer}
+.toggle input{width:22px;height:22px;accent-color:var(--accent);flex:none}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
 </head>
@@ -342,7 +348,7 @@ main();
 <script type="module">
 import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,setDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,setDoc,deleteDoc,addDoc,collection,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Envoi anonyme vers Firestore (aucun nom n'est envoyé) :
 //  - votes/{uid} : favoris et « J'y vais » (statistiques), seulement si « Mon espace » est créé ;
 //  - tokens/{uid} : adresse de notification du téléphone (si les notifications sont activées),
@@ -362,12 +368,15 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
       const tk=window.chariotToken;
       if(tk){
         const L=window.chariotLog||(()=>{});
-        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[]},b); L("Abonnement enregistré dans Firestore"); }
+        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[],rem:st&&st.rem?st.rem:{veille:true,jourj:true,avis:true}},b); L("Abonnement enregistré dans Firestore"); }
         catch(e){console.warn("Abonnement aux notifications non enregistré",e);L("Erreur Firestore : "+(e.code||"")+" "+e.message)}
       }
     };
     window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
-    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;(window.chariotLog||(()=>{}))("Connexion anonyme OK");push()}});
+    // Ouverture depuis une notification (?n=type) : compteur anonyme pour les statistiques
+    const logOpen=async()=>{try{const q=new URLSearchParams(location.search),n=q.get("n");if(!n)return;const k="chariot-n-"+location.search;if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");
+      await addDoc(collection(db,"ouvertures"),{n:n.slice(0,60),at:serverTimestamp()});q.delete("n");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash)}catch(e){console.warn("Ouverture non comptée",e)}};
+    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;(window.chariotLog||(()=>{}))("Connexion anonyme OK");push();logOpen()}});
     signInAnonymously(auth).catch(e=>{console.warn("Connexion anonyme impossible",e);(window.chariotLog||(()=>{}))("Erreur connexion : "+(e.code||"")+" "+e.message)});
   }catch(e){console.warn(e)}
 }
@@ -407,17 +416,24 @@ function poster(s,cls=""){
   const h=[...s.id].reduce((a,c)=>a+c.charCodeAt(0),0);
   return `<div class="poster ${cls}" style="--p:${s.p};--x:${20+h%60}%;--a:${(h*37)%180}deg" aria-hidden="true"><span>${esc(s.t)}</span></div>`;
 }
+// Pastille « Nouveau » : spectacles apparus depuis la dernière visite (affichée 7 jours)
+const NEWK="chariot-vus",NOWT=Date.now();
+const NEWS=(()=>{let m=null;try{m=JSON.parse(localStorage.getItem(NEWK)||"null")}catch(e){}
+  const first=!m;m=m||{t0:NOWT,ids:{}};let ch=false;
+  SHOWS.forEach(s=>{if(!s.arch&&!(s.id in m.ids)){m.ids[s.id]=NOWT;ch=true}});
+  if(ch||first){try{localStorage.setItem(NEWK,JSON.stringify(m))}catch(e){}}return m})();
+const isNew=s=>!s.arch&&!done(s)&&NEWS.ids[s.id]>NEWS.t0&&NOWT-NEWS.ids[s.id]<7*864e5;
 function card(s){
   const chips=[s.genre,s.age].filter(Boolean).map(c=>`<span class="chip">${esc(c)}</span>`).join("");
-  return `<button class="show" data-show="${s.id}">${poster(s)}<div><div class="when">${range(s)}${isFav(s.id)?' <span class="heart" aria-label="Favori">♥</span>':""}</div><h3>${esc(s.t)}</h3><div class="by">${esc(s.by)}</div><div class="chips">${todayChip(s)}${chips}</div></div></button>`;
+  return `<button class="show" data-show="${s.id}">${poster(s)}<div><div class="when">${range(s)}${isFav(s.id)?' <span class="heart" aria-label="Favori">♥</span>':""}</div><h3>${esc(s.t)}</h3><div class="by">${esc(s.by)}</div><div class="chips">${isNew(s)?'<span class="chip new">Nouveau</span>':""}${todayChip(s)}${chips}</div></div></button>`;
 }
 
 let state={tab:"programme",seg:"affiche",calM:null,calD:null,q:""};
 let storeOK=true;
-let acct={name:"",last:"",favs:[],plans:[],alerts:[],seen:[],ratings:{},later:[]};
-try{const a=JSON.parse(localStorage.getItem("chariot-compte")||"null");if(a)acct={name:a.name||"",last:a.last||"",favs:a.favs||[],plans:a.plans||[],alerts:a.alerts||[],seen:a.seen||[],ratings:a.ratings||{},later:a.later||[]}}catch(e){storeOK=false}
+let acct={name:"",last:"",favs:[],plans:[],alerts:[],seen:[],ratings:{},later:[],rem:{}};
+try{const a=JSON.parse(localStorage.getItem("chariot-compte")||"null");if(a)acct={name:a.name||"",last:a.last||"",favs:a.favs||[],plans:a.plans||[],alerts:a.alerts||[],seen:a.seen||[],ratings:a.ratings||{},later:a.later||[],rem:a.rem||{}}}catch(e){storeOK=false}
 function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}if(window.chariotSync)window.chariotSync()}
-window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}]))}:null;
+window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}])),rem:{veille:(acct.rem||{}).veille!==false,jourj:(acct.rem||{}).jourj!==false,avis:(acct.rem||{}).avis!==false}}:null;
 const hasAcct=()=>!!(acct.name&&acct.last);
 const isFull=(s,x)=>(s.full||[]).includes(x);
 const isFav=id=>acct.favs.includes(id);
@@ -582,6 +598,12 @@ const views={
     ${favs.length?`<div class="list">${favs.map(card).join("")}</div>`:'<p class="small">Aucun favori. Touchez « Ajouter aux favoris » dans la fiche d\'un spectacle.</p>'}
    </section>
    ${alertsHTML()}
+   <section class="card"><span class="label">Mes rappels par notification</span>
+    <label class="toggle"><span><b>La veille</b><span class="small" style="display:block">Vers 10 h, pour vos séances « J'y vais »</span></span><input type="checkbox" data-rem="veille" ${remOn("veille")?"checked":""}></label>
+    <label class="toggle"><span><b>Le jour J, 1 h avant</b><span class="small" style="display:block">« Dans 1 h : … », avec l'adresse</span></span><input type="checkbox" data-rem="jourj" ${remOn("jourj")?"checked":""}></label>
+    <label class="toggle"><span><b>Le lendemain : votre avis</b><span class="small" style="display:block">« Vous avez aimé ? », pour noter le spectacle</span></span><input type="checkbox" data-rem="avis" ${remOn("avis")?"checked":""}></label>
+    <p class="small">Il faut avoir activé les notifications de l'appli installée.</p>
+   </section>
    <section class="card"><span class="label">Mon profil</span>
     <form id="rename" class="stack"><div class="field"><label class="label" for="acct-rename">Prénom</label><input id="acct-rename" name="name" autocomplete="given-name" value="${esc(acct.name)}" required maxlength="40"></div><div class="field"><label class="label" for="acct-relast">Nom</label><input id="acct-relast" name="last" autocomplete="family-name" value="${esc(acct.last)}" required maxlength="60"></div><button class="btn ghost" type="submit">Enregistrer</button></form>
     <div id="del-zone"><button class="btn ghost" id="del-ask" type="button">Supprimer mon espace</button></div>
@@ -597,6 +619,7 @@ const views={
    <section class="card"><span class="label">E-mail</span><div class="copyrow"><span class="v">lechariot.contact@gmail.com</span><button class="btn ghost" data-copy="lechariot.contact@gmail.com">Copier</button></div></section>
    <section class="card"><span class="label">Billetterie</span><h3>En ligne</h3><p>Achetez vos places sur Eventim.</p><a class="btn" href="${BILLET}" target="_blank" rel="noopener">Réserver en ligne</a>
     <h3>Sur place</h3><p>Billets en vente au théâtre dans la limite des places disponibles. Arrivez tôt pour garantir votre accès.</p></section>
+   <section class="card qr"><span class="label">Faire installer l'appli</span><div class="qr-box" id="qr-app" data-notr aria-label="QR code de l'appli du Chariot"></div><p class="small">Montrez ce code : il suffit de le scanner avec l'appareil photo du téléphone pour installer l'appli.</p><button class="btn ghost" type="button" data-share-app="1">Partager le lien de l'appli</button></section>
    <section class="card"><span class="label">Suivez-nous</span><a class="btn ghost" href="https://www.instagram.com/theatreduchariot/" target="_blank" rel="noopener">Instagram @theatreduchariot</a><a class="btn ghost" href="https://www.tiktok.com/@le.chariot25" target="_blank" rel="noopener">TikTok @le.chariot25</a></section>
   </div>`;
  }
@@ -1101,9 +1124,47 @@ Object.assign(I18N_SUF,{
  "pour rêver":["to dream","para soñar","zum Träumen","per sognare","чтобы помечтать"]
 });
 
+// ==== Rappels, QR code, raccourcis, hors connexion ====
+const remOn=k=>(acct.rem||{})[k]!==false;
+document.addEventListener("change",e=>{const k=e.target.dataset&&e.target.dataset.rem;if(!k)return;if(needAccount())return;acct.rem={...(acct.rem||{}),[k]:e.target.checked};saveAcct();toast(e.target.checked?"Rappel activé":"Rappel désactivé")});
+const INSTALL_URL="https://theatreduchariot.github.io/?installer";
+// QR code (bibliothèque qrcode-generator, chargée à la demande)
+function drawQR(){
+  const box=document.getElementById("qr-app");if(!box||box.dataset.done)return;
+  const go=()=>{try{const q=qrcode(0,"M");q.addData(INSTALL_URL);q.make();box.innerHTML=q.createSvgTag(6,12);const sv=box.querySelector("svg");if(sv){const w=parseInt(sv.getAttribute("width")),h=parseInt(sv.getAttribute("height"));if(w&&!sv.getAttribute("viewBox"))sv.setAttribute("viewBox",`0 0 ${w} ${h}`);sv.removeAttribute("width");sv.removeAttribute("height")}box.dataset.done="1"}catch(e){box.textContent=INSTALL_URL}};
+  if(window.qrcode)return go();
+  if(drawQR.loading)return;drawQR.loading=true;
+  const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";sc.onload=()=>{drawQR.loading=false;go()};sc.onerror=()=>{box.textContent=INSTALL_URL};document.head.appendChild(sc);
+}
+new MutationObserver(()=>{if(document.getElementById("qr-app"))drawQR()}).observe(document.getElementById("view"),{childList:true});
+document.addEventListener("click",e=>{if(!e.target.closest("[data-share-app]"))return;shareText("Théâtre du Chariot","L'appli du Théâtre du Chariot : programme, rappels et nouveautés.",INSTALL_URL)});
+// Hors connexion
+window.addEventListener("offline",()=>toast("Hors connexion : programme de votre dernière visite"));
+window.addEventListener("online",()=>toast("Connexion rétablie"));
+Object.assign(I18N,{
+ "Nouveau":["New","Nuevo","Neu","Novità","Новинка"],
+ "Mes rappels par notification":["My notification reminders","Mis recordatorios","Meine Erinnerungen","I miei promemoria","Мои напоминания"],
+ "La veille":["The day before","El día antes","Am Vortag","Il giorno prima","Накануне"],
+ "Vers 10 h, pour vos séances « J'y vais »":["Around 10 am, for your “I'm going” performances","Hacia las 10, para tus funciones «Voy»","Gegen 10 Uhr, für deine „Ich gehe hin“-Termine","Verso le 10, per le tue repliche «Ci vado»","Около 10:00, для отмеченных спектаклей"],
+ "Le jour J, 1 h avant":["On the day, 1 hr before","El mismo día, 1 h antes","Am Tag selbst, 1 Std. vorher","Il giorno stesso, 1 ora prima","В день спектакля, за 1 час"],
+ "« Dans 1 h : … », avec l'adresse":["“In 1 hr: …”, with the address","«En 1 h: …», con la dirección","„In 1 Std.: …“, mit Adresse","«Tra 1 ora: …», con l'indirizzo","«Через 1 час: …» с адресом"],
+ "Le lendemain : votre avis":["The day after: your review","Al día siguiente: tu opinión","Am Tag danach: deine Bewertung","Il giorno dopo: la tua opinione","На следующий день: отзыв"],
+ "« Vous avez aimé ? », pour noter le spectacle":["“Did you enjoy it?”, to rate the show","«¿Te ha gustado?», para valorar el espectáculo","„Hat es dir gefallen?“, um das Stück zu bewerten","«Ti è piaciuto?», per votare lo spettacolo","«Вам понравилось?» — чтобы оценить спектакль"],
+ "Il faut avoir activé les notifications de l'appli installée.":["Notifications must be turned on in the installed app.","Hay que activar las notificaciones en la app instalada.","Benachrichtigungen müssen in der installierten App aktiviert sein.","Occorre attivare le notifiche nell'app installata.","Нужно включить уведомления в установленном приложении."],
+ "Rappel activé":["Reminder on","Recordatorio activado","Erinnerung an","Promemoria attivato","Напоминание включено"],
+ "Rappel désactivé":["Reminder off","Recordatorio desactivado","Erinnerung aus","Promemoria disattivato","Напоминание выключено"],
+ "Faire installer l'appli":["Get someone to install the app","Hacer instalar la app","App weiterempfehlen","Fai installare l'app","Поделиться приложением"],
+ "Montrez ce code : il suffit de le scanner avec l'appareil photo du téléphone pour installer l'appli.":["Show this code: just scan it with the phone camera to install the app.","Muestra este código: basta con escanearlo con la cámara del móvil para instalar la app.","Zeig diesen Code: Einfach mit der Handykamera scannen, um die App zu installieren.","Mostra questo codice: basta scansionarlo con la fotocamera per installare l'app.","Покажите этот код: достаточно навести камеру телефона, чтобы установить приложение."],
+ "Partager le lien de l'appli":["Share the app link","Compartir el enlace de la app","App-Link teilen","Condividi il link dell'app","Поделиться ссылкой"],
+ "QR code de l'appli du Chariot":["QR code for the Chariot app","Código QR de la app del Chariot","QR-Code der Chariot-App","Codice QR dell'app del Chariot","QR-код приложения «Шарио»"],
+ "Hors connexion : programme de votre dernière visite":["Offline: programme from your last visit","Sin conexión: programa de tu última visita","Offline: Programm deines letzten Besuchs","Offline: programma della tua ultima visita","Нет сети: афиша с последнего визита"],
+ "Connexion rétablie":["Back online","Conexión restablecida","Wieder online","Connessione ristabilita","Сеть восстановлена"],
+ "Direction de jeu":["Acting direction","Dirección de actores","Schauspielführung","Direzione degli attori","Работа с актёром"]
+});
+
 render();
 // Lien direct vers une fiche (?s=identifiant), utilisé par le bouton Partager
-(function(){try{const q=new URLSearchParams(location.search),id=q.get("s"),iv=q.get("inv");if(id&&SHOWS.some(x=>x.id===id))openShow(id);if(iv){const[i,x]=iv.split("|");openInvite(i,x,q.get("de")||"")}}catch(e){}})();
+(function(){try{const q=new URLSearchParams(location.search),id=q.get("s"),iv=q.get("inv"),f=q.get("f");if(f&&(QF[f]||(f.startsWith("m:")&&MOODS[f.slice(2)]))){state.tab="programme";state.qf=f;render()}if(id&&SHOWS.some(x=>x.id===id))openShow(id);if(iv){const[i,x]=iv.split("|");openInvite(i,x,q.get("de")||"")}}catch(e){}})();
 // Message d'accueil affiché à la première ouverture
 (function(){
   let seen=false;try{seen=localStorage.getItem("chariot-bienvenue")==="1"}catch(e){}

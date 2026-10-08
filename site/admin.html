@@ -7,7 +7,7 @@
 <title>Chariot · Statistiques</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Montserrat:wght@400;500;600&display=swap">
 <style>
-:root{--bg:#ffffff;--surface:#fff;--ink:#000;--muted:#5c5c5c;--line:#e2e2e2;--accent:#ff00ff;--accent-ink:#000;--chip:#f2f2f2;
+:root{--bg:#ffffff;--surface:#fff;--ink:#000;--muted:#5c5c5c;--line:#e2e2e2;--accent:#ff00ff;--accent-ink:#000;--chip:#f2f2f2;--ok:#0a7d34;--ko:#c0002a;
   --display:"Poppins","Helvetica Neue",Arial,sans-serif;--body:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
@@ -15,9 +15,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
 h1{font:800 32px/1.05 var(--display);margin:0}
 h2{font:700 18px var(--display);margin:0}
 .muted{color:var(--muted)}
+.small{font-size:13px}
 .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:11px 18px;font:600 14px var(--body);cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
 .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;min-width:0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .kpi b{display:block;font:800 30px var(--display);font-variant-numeric:tabular-nums}
 .label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -30,7 +32,18 @@ td.n{text-align:right;font-weight:600}th.n{text-align:right}
 details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600}
 details ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-.err{background:var(--chip);border-radius:12px;padding:12px}
+.err{background:var(--chip);border-radius:12px;padding:12px;margin:0}
+label.f{display:grid;gap:4px;font-size:13px;font-weight:600}
+input[type=text],textarea,select{font:15px var(--body);padding:10px;border:1.5px solid var(--line);border-radius:8px;width:100%;background:#fff;color:var(--ink)}
+textarea{min-height:80px;resize:vertical}
+.preview{background:var(--chip);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:flex-start}
+.preview img{width:36px;height:36px;border-radius:8px;flex:none}
+.preview b{display:block}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.ok{background:var(--ok)}.ko{background:var(--ko)}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:16px;font-size:13px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px}
 </style>
 </head>
 <body>
@@ -39,20 +52,26 @@ details ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
     <div class="row"><button class="btn ghost" id="refresh" hidden>Actualiser</button><button class="btn" id="login">Se connecter avec Google</button></div></div>
   <p class="muted" id="who" hidden></p>
   <p class="muted" id="status">Connectez-vous avec le compte Google administrateur pour voir les chiffres.</p>
-  <div id="out"></div>
+  <div id="out" style="display:grid;gap:18px"></div>
 </div>
 <script src="firebase-config.js"></script>
 <script src="shows.js"></script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,getDocs,addDoc,doc,setDoc,query,where,orderBy,limit,serverTimestamp,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getMessaging,getToken,isSupported} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $=id=>document.getElementById(id);
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MOIS=["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
 const JOURS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
-const label=x=>{const d=new Date(Y,+x.slice(0,2)-1,+x.slice(3,5),+x.slice(6,8),+x.slice(9,11));return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} à ${d.getHours()}h${d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""}`};
+const sesDate=x=>new Date(Y,+x.slice(0,2)-1,+x.slice(3,5),+x.slice(6,8),+x.slice(9,11));
+const label=x=>{const d=sesDate(x);return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} à ${d.getHours()}h${d.getMinutes()?String(d.getMinutes()).padStart(2,"0"):""}`};
+const fmtTs=t=>{if(!t)return "";const d=t.toDate?t.toDate():new Date(t);return d.toLocaleString("fr-FR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})};
+const KINDS={nouveau:"Nouveau spectacle",dates:"Nouvelles dates",complet:"Ça part vite",libere:"Place libérée",jourj:"Dans 1 h",demain:"La veille",avis:"Vous avez aimé ?",dernieres:"Dernières dates",recap:"Récap de la semaine",equipe:"Messages de l'équipe",test:"Essais"};
+const byId=Object.fromEntries(SHOWS.map(s=>[s.id,s]));
+const upcoming=SHOWS.filter(s=>!s.arch&&(s.sessions||[]).some(x=>sesDate(x)>new Date()));
 
 const cfg=window.FIREBASE_CONFIG;
 if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
@@ -87,29 +106,51 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
     $("who").hidden=!ok; if(ok)$("who").textContent="Connecté avec : "+(u.email||"adresse inconnue");
     if(ok)load(); else {$("out").innerHTML="";$("status").textContent="Connectez-vous avec le compte Google administrateur pour voir les chiffres."}
   });
+
+  // Une partie qui échoue (ex. règles pas encore publiées) n'empêche pas le reste de s'afficher
+  const safe=async(f,d)=>{try{return await f()}catch(e){console.warn(e);return d}};
+  const RULES_MSG=`<p class="err small">Cette partie a besoin des nouvelles règles Firestore (Firestore &gt; Règles &gt; Publier).</p>`;
+  let exportRows=[];
+
   async function load(){
     $("status").textContent="Chargement…";
     try{
       const snap=await getDocs(collection(db,"votes"));
+      const [statsDocs,envois,opens,synchro]=await Promise.all([
+        safe(async()=>(await getDocs(collection(db,"stats"))).docs.map(d=>d.data()).sort((a,b)=>String(a.jour).localeCompare(String(b.jour))),null),
+        safe(async()=>(await getDocs(query(collection(db,"envois"),orderBy("creeLe","desc"),limit(15)))).docs.map(d=>({id:d.id,...d.data()})),null),
+        safe(async()=>(await getDocs(query(collection(db,"ouvertures"),where("at",">=",Timestamp.fromMillis(Date.now()-90*864e5))))).docs.map(d=>d.data()),null),
+        safe(async()=>{const r=await fetch("synchro.json?t="+Date.now(),{cache:"no-store"});return r.ok?await r.json():null},null)
+      ]);
+
+      // ----- votes : par spectacle -----
       const stats={};SHOWS.forEach(s=>stats[s.id]={favs:0,go:new Set(),ses:{},notes:[],txt:[]});
-      let people=0,active=0;
+      let people=0,active=0;exportRows=[];
       snap.forEach(d=>{
         const v=d.data();people++;
         if((v.favs||[]).length||(v.plans||[]).length)active++;
         (v.favs||[]).forEach(id=>{if(stats[id])stats[id].favs++});
-        Object.entries(v.ratings||{}).forEach(([id,o])=>{if(!stats[id]||!o||!(o.n>=1&&o.n<=5))return;stats[id].notes.push(o.n);if(o.txt)stats[id].txt.push({n:o.n,t:String(o.txt).slice(0,500)})});
+        Object.entries(v.ratings||{}).forEach(([id,o])=>{if(!stats[id]||!o||!(o.n>=1&&o.n<=5))return;stats[id].notes.push(o.n);if(o.txt)stats[id].txt.push({n:o.n,t:String(o.txt).slice(0,500)});exportRows.push([stats[id]&&byId[id]?byId[id].t:id,o.n,String(o.txt||"").slice(0,500)])});
         (v.plans||[]).forEach(k=>{const[id,x]=k.split("|");if(!stats[id])return;stats[id].go.add(d.id);stats[id].ses[x]=(stats[id].ses[x]||0)+1});
       });
-      const rows=SHOWS.map(s=>({s,f:stats[s.id].favs,g:stats[s.id].go.size,ses:stats[s.id].ses,notes:stats[s.id].notes,txt:stats[s.id].txt})).sort((a,b)=>(b.f+b.g)-(a.f+a.g));
+      const rows=SHOWS.map(s=>({s,f:stats[s.id].favs,g:stats[s.id].go.size,ses:stats[s.id].ses,notes:stats[s.id].notes,txt:stats[s.id].txt})).filter(r=>!r.s.arch||r.f||r.g||r.notes.length).sort((a,b)=>(b.f+b.g)-(a.f+a.g));
       const max=Math.max(1,...rows.map(r=>Math.max(r.f,r.g)));
       const totF=rows.reduce((a,r)=>a+r.f,0),totG=rows.reduce((a,r)=>a+Object.values(r.ses).reduce((x,y)=>x+y,0),0);
-      $("out").innerHTML=`<div class="kpis">
+      const lastStat=statsDocs&&[...statsDocs].reverse().find(s=>typeof s.abonnes==="number");
+
+      $("out").innerHTML=`
+      ${syncHTML(synchro)}
+      <div class="kpis">
+        <div class="card kpi"><span class="label">Abonnés aux notifications</span><b>${lastStat?lastStat.abonnes:"—"}</b></div>
         <div class="card kpi"><span class="label">Espaces créés</span><b>${people}</b></div>
         <div class="card kpi"><span class="label">Espaces actifs</span><b>${active}</b></div>
         <div class="card kpi"><span class="label">Favoris au total</span><b>${totF}</b></div>
         <div class="card kpi"><span class="label">« J'y vais » au total</span><b>${totG}</b></div>
         <div class="card kpi"><span class="label">Avis reçus</span><b>${rows.reduce((a,r)=>a+r.notes.length,0)}</b></div></div>
-      <div class="card"><h2>Par spectacle</h2><div class="scroll"><table>
+      ${sendHTML(envois,opens)}
+      ${chartHTML(statsDocs)}
+      ${opensHTML(statsDocs,opens)}
+      <div class="card"><div class="row"><h2>Par spectacle</h2><button class="btn ghost" id="csv" ${exportRows.length?"":"disabled"}>Exporter les avis (tableur)</button></div><div class="scroll"><table>
         <thead><tr><th>Spectacle</th><th class="n">Favoris</th><th class="n">Personnes « J'y vais »</th><th class="n">Avis</th></tr></thead><tbody>
         ${rows.map(r=>{const det=Object.entries(r.ses).sort(([a],[b])=>a.localeCompare(b));return `<tr><td><b>${esc(r.s.t)}</b>
           <div class="bar" style="width:${Math.round(100*Math.max(r.f,r.g)/max)}%"></div>
@@ -117,12 +158,111 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
           ${det.length?`<details><summary>Détail par séance</summary><ul>${det.map(([x,n])=>`<li>${label(x)} : ${n}</li>`).join("")}</ul></details>`:""}</td>
           <td class="n">${r.f}</td><td class="n">${r.g}</td><td class="n">${r.notes.length?(r.notes.reduce((a,b)=>a+b,0)/r.notes.length).toFixed(1).replace(".",",")+" ★ <span class=\"muted\" style=\"font-weight:400\">("+r.notes.length+")</span>":"—"}</td></tr>`}).join("")}
         </tbody></table></div></div>
+      <div class="card"><h2>Alertes techniques</h2>
+        <p class="small muted">Recevez une notification sur ce téléphone si la mise à jour automatique du programme (toutes les heures) tombe en panne, puis quand elle repart. À faire une fois, depuis l'appli installée ou le navigateur du téléphone.</p>
+        <div><button class="btn ghost" id="alerts">Recevoir les alertes sur cet appareil</button></div><p class="small" id="alerts-st"></p></div>
       <p class="muted">Chiffres et avis anonymes : les commentaires peuvent être transmis aux compagnies. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
+      wire();
       $("status").textContent="Mis à jour le "+new Date().toLocaleString("fr-FR");
     }catch(e){
       const em=(auth.currentUser&&auth.currentUser.email)||"?";$("out").innerHTML=e.code==="permission-denied"?`<p class="err">Accès refusé : l'adresse <b>${esc(em)}</b> n'est pas autorisée dans les règles Firestore. Déconnectez-vous et reconnectez-vous avec l'adresse administrateur, ou ajoutez cette adresse dans Firestore &gt; Règles (ligne request.auth.token.email), puis cliquez sur Publier.</p>`:`<p class="err">Erreur : ${esc(e.message)}</p>`;
       $("status").textContent="";
     }
+  }
+
+  // ----- état de la synchro horaire -----
+  function syncHTML(s){
+    if(!s||!s.at)return `<div class="card"><div><span class="dot" style="background:#aaa"></span><b>Mise à jour automatique du programme</b> : pas encore d'information.</div></div>`;
+    const h=(Date.now()-new Date(s.at).getTime())/36e5,ok=s.ok!==false&&h<3;
+    const age=h<1?Math.max(1,Math.round(h*60))+" min":Math.floor(h)+" h";
+    return `<div class="card"><div><span class="dot ${ok?"ok":"ko"}"></span><b>Mise à jour automatique du programme : ${ok?"OK":"en panne"}</b> <span class="muted small">· dernier passage il y a ${age}</span></div>${s.detail?`<div class="small muted">${esc(s.detail)}</div>`:""}</div>`;
+  }
+
+  // ----- envoyer une notification -----
+  function sendHTML(envois,opens){
+    const oc={};(opens||[]).forEach(o=>{oc[o.n]=(oc[o.n]||0)+1});
+    const cib=c=>!c||c.type==="tous"?"Tout le monde":c.type==="spectacle"?"Fans de "+(byId[c.id]?byId[c.id].t:c.id):"Spectateurs du "+label(c.x)+" ("+(byId[c.id]?byId[c.id].t:c.id)+")";
+    return `<div class="card"><h2>Envoyer une notification</h2>
+      <label class="f">Destinataires<select id="n-type"><option value="tous">Tous les abonnés</option><option value="spectacle">Les fans d'un spectacle (favori ou « J'y vais »)</option><option value="seance">Les spectateurs d'une séance (« J'y vais »)</option></select></label>
+      <label class="f" id="n-show-w" hidden>Spectacle<select id="n-show">${upcoming.map(s=>`<option value="${esc(s.id)}">${esc(s.t)}</option>`).join("")}</select></label>
+      <label class="f" id="n-ses-w" hidden>Séance<select id="n-ses"></select></label>
+      <label class="f">Titre <span class="muted" style="font-weight:400">(80 caractères max.)</span><input type="text" id="n-title" maxlength="80" placeholder="Ex. : Changement d'horaire ce soir"></label>
+      <label class="f">Message <span class="muted" style="font-weight:400">(240 caractères max.)</span><textarea id="n-body" maxlength="240" placeholder="Ex. : La représentation commence à 20h30 au lieu de 20h."></textarea></label>
+      <div class="preview"><img src="icon-192.png" alt=""><div><b id="p-t">Titre</b><span class="small" id="p-b">Message</span></div></div>
+      <div class="row"><span class="small muted">Envoi dans les 5 minutes. Toucher la notification ouvre l'appli.</span><button class="btn" id="n-send">Envoyer</button></div>
+      <p class="small" id="n-st"></p>
+      ${envois===null?RULES_MSG:envois.length?`<details><summary>Derniers envois (${envois.length})</summary><div class="scroll"><table><thead><tr><th>Message</th><th>Destinataires</th><th class="n">Reçus</th><th class="n">Ouverts</th></tr></thead><tbody>
+        ${envois.map(e=>`<tr><td><b>${esc(e.titre||"")}</b><div class="small muted">${esc(e.texte||"")}</div><div class="small muted">${fmtTs(e.creeLe)}${e.par?" · "+esc(e.par):""}</div></td><td class="small">${esc(cib(e.cible))}</td><td class="n">${e.statut==="envoyé"?(e.envoyes||0):`<span class="muted" style="font-weight:400">${esc(e.statut||"")}</span>`}</td><td class="n">${oc["e:"+e.id]||0}</td></tr>`).join("")}
+      </tbody></table></div></details>`:""}
+    </div>`;
+  }
+
+  // ----- courbe des abonnés -----
+  function chartHTML(st){
+    if(st===null)return `<div class="card"><h2>Évolution</h2>${RULES_MSG}</div>`;
+    const pts=(st||[]).filter(s=>typeof s.abonnes==="number");
+    if(pts.length<2)return `<div class="card"><h2>Évolution</h2><p class="small muted">La courbe apparaîtra après deux jours de relevés (un relevé par jour, vers 10 h).</p></div>`;
+    const W=640,H=220,L=36,R=10,T=10,B=28,mx=Math.max(1,...pts.map(p=>Math.max(p.abonnes,p.espaces||0)));
+    const X=i=>L+(W-L-R)*i/(pts.length-1),Yv=v=>T+(H-T-B)*(1-v/mx);
+    const line=(k,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p,i)=>X(i).toFixed(1)+","+Yv(p[k]||0).toFixed(1)).join(" ")}"/>`;
+    const ticks=[0,Math.round(mx/2),mx].map(v=>`<text x="${L-6}" y="${Yv(v)+4}" text-anchor="end" font-size="11" fill="#5c5c5c">${v}</text><line x1="${L}" x2="${W-R}" y1="${Yv(v)}" y2="${Yv(v)}" stroke="#eee"/>`).join("");
+    const d=s=>{const[,m,j]=s.split("-");return `${+j} ${MOIS[+m-1]}`};
+    const xl=[0,Math.floor((pts.length-1)/2),pts.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>`<text x="${X(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="#5c5c5c">${d(pts[i].jour)}</text>`).join("");
+    return `<div class="card chart"><h2>Évolution</h2><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution des abonnés et des espaces">${ticks}${xl}${line("espaces","#999")}${line("abonnes","#ff00ff")}</svg>
+      <div class="legend"><span><i style="background:#ff00ff"></i>Abonnés aux notifications</span><span><i style="background:#999"></i>Espaces créés</span></div></div>`;
+  }
+
+  // ----- notifications envoyées / ouvertes (90 jours) -----
+  function opensHTML(st,opens){
+    if(st===null||opens===null)return `<div class="card"><h2>Notifications ouvertes</h2>${RULES_MSG}</div>`;
+    const lim=new Date(Date.now()-90*864e5).toISOString().slice(0,10),sent={},op={};
+    (st||[]).filter(s=>s.jour>=lim).forEach(s=>Object.entries(s).forEach(([k,v])=>{if(k.startsWith("envoyes_"))sent[k.slice(8)]=(sent[k.slice(8)]||0)+v}));
+    opens.forEach(o=>{const k=String(o.n).startsWith("e:")?"equipe":o.n;op[k]=(op[k]||0)+1});
+    const ks=Object.keys(KINDS).filter(k=>sent[k]||op[k]);
+    if(!ks.length)return `<div class="card"><h2>Notifications ouvertes</h2><p class="small muted">Pas encore de chiffres : ils s'afficheront après les premiers envois.</p></div>`;
+    return `<div class="card"><h2>Notifications ouvertes <span class="muted small" style="font-weight:400">· 90 derniers jours</span></h2><div class="scroll"><table><thead><tr><th>Type</th><th class="n">Envoyées</th><th class="n">Ouvertes</th><th class="n">Taux</th></tr></thead><tbody>
+      ${ks.map(k=>`<tr><td>${KINDS[k]}</td><td class="n">${sent[k]||0}</td><td class="n">${op[k]||0}</td><td class="n">${sent[k]?Math.round(100*(op[k]||0)/sent[k])+" %":"—"}</td></tr>`).join("")}
+      </tbody></table></div><p class="small muted">« Ouvertes » = notifications touchées pour ouvrir l'appli.</p></div>`;
+  }
+
+  function wire(){
+    const ty=$("n-type"),sh=$("n-show"),se=$("n-ses");
+    const fillSes=()=>{const s=byId[sh.value];se.innerHTML=s?s.sessions.filter(x=>sesDate(x)>new Date()).map(x=>`<option value="${esc(x)}">${label(x)}</option>`).join(""):""};
+    ty.onchange=()=>{$("n-show-w").hidden=ty.value==="tous";$("n-ses-w").hidden=ty.value!=="seance";fillSes()};
+    sh.onchange=fillSes;
+    const pv=()=>{$("p-t").textContent=$("n-title").value.trim()||"Titre";$("p-b").textContent=$("n-body").value.trim()||"Message"};
+    $("n-title").oninput=pv;$("n-body").oninput=pv;
+    $("n-send").onclick=async()=>{
+      const titre=$("n-title").value.trim().slice(0,80),texte=$("n-body").value.trim().slice(0,240),st=$("n-st");
+      if(!titre||!texte){st.textContent="Écrivez un titre et un message.";return}
+      const cible=ty.value==="tous"?{type:"tous"}:ty.value==="spectacle"?{type:"spectacle",id:sh.value}:{type:"seance",id:sh.value,x:se.value};
+      if(cible.type!=="tous"&&!cible.id||cible.type==="seance"&&!cible.x){st.textContent="Choisissez le spectacle et la séance.";return}
+      const qui=cible.type==="tous"?"à tous les abonnés":cible.type==="spectacle"?"aux fans de « "+byId[cible.id].t+" »":"aux spectateurs du "+label(cible.x)+" (« "+byId[cible.id].t+" »)";
+      if(!confirm(`Envoyer cette notification ${qui} ?\n\n${titre}\n${texte}`))return;
+      $("n-send").disabled=true;st.textContent="Envoi…";
+      try{
+        await addDoc(collection(db,"envois"),{titre,texte,cible,statut:"en attente",par:auth.currentUser.email||"",creeLe:serverTimestamp()});
+        st.textContent="✓ C'est parti : la notification arrivera sur les téléphones dans les 5 minutes.";
+        $("n-title").value="";$("n-body").value="";pv();
+      }catch(e){st.textContent=e.code==="permission-denied"?"Refusé : publiez d'abord les nouvelles règles Firestore.":"Erreur : "+e.message}
+      $("n-send").disabled=false;
+    };
+    const csv=$("csv");if(csv)csv.onclick=()=>{
+      const q=v=>{const s=String(v);return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+      const txt="﻿"+[["Spectacle","Note","Commentaire"],...exportRows.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))||b[1]-a[1])].map(r=>r.map(q).join(";")).join("\r\n");
+      const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="avis-chariot-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove();
+    };
+    $("alerts").onclick=async()=>{
+      const st=$("alerts-st");st.textContent="Activation…";
+      try{
+        if(!(await isSupported())||!("Notification" in window)){st.textContent="Ce navigateur ne gère pas les notifications. Sur iPhone : installez d'abord l'appli sur l'écran d'accueil.";return}
+        if(await Notification.requestPermission()!=="granted"){st.textContent="Notifications refusées : autorisez-les dans les réglages du navigateur, puis réessayez.";return}
+        const reg=await navigator.serviceWorker.register("sw.js");await navigator.serviceWorker.ready;
+        const token=await getToken(getMessaging(app),{vapidKey:self.FIREBASE_VAPID_KEY,serviceWorkerRegistration:reg});
+        await setDoc(doc(db,"admins",auth.currentUser.uid),{token,email:auth.currentUser.email||"",at:serverTimestamp()});
+        st.textContent="✓ Cet appareil recevra les alertes techniques.";
+      }catch(e){st.textContent=e.code==="permission-denied"?"Refusé : publiez d'abord les nouvelles règles Firestore.":"Erreur : "+(e.message||e)}
+    };
   }
 }
 </script>

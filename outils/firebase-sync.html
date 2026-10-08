@@ -1,7 +1,7 @@
 <script type="module">
 import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,setDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,setDoc,deleteDoc,addDoc,collection,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Envoi anonyme vers Firestore (aucun nom n'est envoyé) :
 //  - votes/{uid} : favoris et « J'y vais » (statistiques), seulement si « Mon espace » est créé ;
 //  - tokens/{uid} : adresse de notification du téléphone (si les notifications sont activées),
@@ -21,12 +21,15 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
       const tk=window.chariotToken;
       if(tk){
         const L=window.chariotLog||(()=>{});
-        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[]},b); L("Abonnement enregistré dans Firestore"); }
+        try{ const b={token:tk,favs:st?st.favs:[],plans:st?st.plans:[],updatedAt:serverTimestamp()}; await put("tokens",{...b,alerts:st&&st.alerts?st.alerts:[],rem:st&&st.rem?st.rem:{veille:true,jourj:true,avis:true}},b); L("Abonnement enregistré dans Firestore"); }
         catch(e){console.warn("Abonnement aux notifications non enregistré",e);L("Erreur Firestore : "+(e.code||"")+" "+e.message)}
       }
     };
     window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
-    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;(window.chariotLog||(()=>{}))("Connexion anonyme OK");push()}});
+    // Ouverture depuis une notification (?n=type) : compteur anonyme pour les statistiques
+    const logOpen=async()=>{try{const q=new URLSearchParams(location.search),n=q.get("n");if(!n)return;const k="chariot-n-"+location.search;if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");
+      await addDoc(collection(db,"ouvertures"),{n:n.slice(0,60),at:serverTimestamp()});q.delete("n");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash)}catch(e){console.warn("Ouverture non comptée",e)}};
+    onAuthStateChanged(auth,u=>{if(u){uid=u.uid;(window.chariotLog||(()=>{}))("Connexion anonyme OK");push();logOpen()}});
     signInAnonymously(auth).catch(e=>{console.warn("Connexion anonyme impossible",e);(window.chariotLog||(()=>{}))("Erreur connexion : "+(e.code||"")+" "+e.message)});
   }catch(e){console.warn(e)}
 }

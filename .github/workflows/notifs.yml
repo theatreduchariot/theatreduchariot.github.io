@@ -1,6 +1,8 @@
 # Notifications automatiques (voir outils/notifier.mjs).
-# - à chaque mise à jour du programme : nouveau spectacle, nouvelles dates, séance complète ;
-# - chaque matin vers 10h (heure de Paris) : rappels « demain » et, le lundi, le récap de la semaine.
+# - à chaque mise à jour du programme : nouveau spectacle, nouvelles dates, séance complète, place libérée ;
+# - toutes les 5 minutes : messages écrits par l'équipe (page admin), rappel « Dans 1 h », surveillance de la synchro ;
+# - chaque matin vers 10h (heure de Paris) : rappels « demain », avis du lendemain, dernières dates, récap du lundi.
+# Un passage sans rien à faire ne lit presque rien dans Firestore (quelques lectures).
 # Nécessite le secret FIREBASE_SERVICE_ACCOUNT (Settings > Secrets and variables > Actions).
 name: Notifications automatiques
 on:
@@ -8,7 +10,7 @@ on:
     branches: [main]
     paths: [site/shows.js]
   schedule:
-    - cron: "0 8 * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       test:

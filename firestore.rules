@@ -2,14 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Adresses Google autorisées à voir les statistiques et à envoyer des notifications (admin.html).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['lechariot.contact@gmail.com', 'rgo071028@gmail.com']
+        && request.auth.token.email_verified == true;
+    }
+
     // Un document par téléphone, identifié de façon anonyme.
     match /votes/{uid} {
-      function isAdmin() {
-        // Adresses Google autorisées à voir les statistiques (admin.html).
-        return request.auth != null
-          && request.auth.token.email in ['lechariot.contact@gmail.com', 'rgo071028@gmail.com']
-          && request.auth.token.email_verified == true;
-      }
       function isOwner() {
         return request.auth != null && request.auth.uid == uid;
       }
@@ -27,15 +28,45 @@ service cloud.firestore {
     }
 
     // Un document par téléphone abonné aux notifications (anonyme) : adresse de notification,
-    // favoris et « J'y vais » pour les rappels. Lu seulement par l'envoi automatique (GitHub).
+    // favoris, « J'y vais » et choix des rappels. Lu seulement par l'envoi automatique (GitHub).
     match /tokens/{uid} {
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['token', 'favs', 'plans', 'alerts', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['token', 'favs', 'plans', 'alerts', 'rem', 'updatedAt'])
         && request.resource.data.token is string && request.resource.data.token.size() < 500
         && request.resource.data.favs is list && request.resource.data.favs.size() <= 50
         && request.resource.data.plans is list && request.resource.data.plans.size() <= 200
-        && (!('alerts' in request.resource.data) || (request.resource.data.alerts is list && request.resource.data.alerts.size() <= 50));
+        && (!('alerts' in request.resource.data) || (request.resource.data.alerts is list && request.resource.data.alerts.size() <= 50))
+        && (!('rem' in request.resource.data) || (request.resource.data.rem is map && request.resource.data.rem.size() <= 5));
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Notifications écrites par l'équipe sur la page admin (envoyées par GitHub dans les 5 minutes).
+    match /envois/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['titre', 'texte', 'cible', 'statut', 'par', 'creeLe'])
+        && request.resource.data.statut == 'en attente'
+        && request.resource.data.titre is string && request.resource.data.titre.size() <= 80
+        && request.resource.data.texte is string && request.resource.data.texte.size() <= 240
+        && request.resource.data.cible is map;
+    }
+
+    // Statistiques du jour (écrites par GitHub, lues par la page admin).
+    match /stats/{id} {
+      allow read: if isAdmin();
+    }
+
+    // Notification touchée pour ouvrir l'appli (anonyme : seulement le type de notification).
+    match /ouvertures/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['n', 'at'])
+        && request.resource.data.n is string && request.resource.data.n.size() < 61;
+      allow read: if isAdmin();
+    }
+
+    // Appareils de l'équipe qui reçoivent les alertes techniques.
+    match /admins/{uid} {
+      allow read, write: if isAdmin() && request.auth.uid == uid;
     }
 
     // Tout le reste est fermé.

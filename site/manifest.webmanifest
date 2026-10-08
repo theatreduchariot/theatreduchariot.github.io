@@ -26,5 +26,43 @@
  ],
  "id": "./",
  "scope": "./",
- "description": "Programme, calendrier et billetterie du Théâtre du Chariot (Paris 11e)."
+ "description": "Programme, calendrier et billetterie du Théâtre du Chariot (Paris 11e).",
+ "shortcuts": [
+  {
+   "name": "Programme",
+   "short_name": "Programme",
+   "url": "./#programme",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  },
+  {
+   "name": "Ce soir au Chariot",
+   "short_name": "Aujourd'hui",
+   "url": "./?f=today",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  },
+  {
+   "name": "Mes sorties",
+   "short_name": "Mes sorties",
+   "url": "./#compte",
+   "icons": [
+    {
+     "src": "icon-192.png",
+     "sizes": "192x192",
+     "type": "image/png"
+    }
+   ]
+  }
+ ]
 }

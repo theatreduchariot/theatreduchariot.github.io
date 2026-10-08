@@ -95,7 +95,7 @@ def main(src_path):
     rest = rest.replace(
         'function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}}',
         'function saveAcct(){try{localStorage.setItem("chariot-compte",JSON.stringify(acct));storeOK=true}catch(e){storeOK=false}if(window.chariotSync)window.chariotSync()}\n'
-        'window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}]))}:null;')
+        'window.chariotState=()=>hasAcct()?{favs:acct.favs.slice(),plans:acct.plans.slice(),alerts:(acct.alerts||[]).slice(),ratings:Object.fromEntries(Object.entries(acct.ratings||{}).map(([k,v])=>[k,{n:v.n,txt:v.txt||""}])),rem:{veille:(acct.rem||{}).veille!==false,jourj:(acct.rem||{}).jourj!==false,avis:(acct.rem||{}).avis!==false}}:null;')
     rest = rest.replace('try{localStorage.removeItem("chariot-compte")}catch(err){}',
                         'try{localStorage.removeItem("chariot-compte")}catch(err){}if(window.chariotSync)window.chariotSync();')
     if "window.chariotState" not in rest:

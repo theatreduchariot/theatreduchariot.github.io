@@ -111,3 +111,18 @@ Mise en route, une seule fois :
 3. Firebase → Firestore → **Règles** : coller le contenu de `firestore.rules`, puis **Publier**.
 
 Les messages écrits à la main depuis Firebase → Messaging fonctionnent toujours.
+
+## Page admin : envoyer une notification, courbes, alertes
+
+Sur https://theatreduchariot.github.io/admin.html (connexion Google administrateur) :
+- **Envoyer une notification** : à tous les abonnés, aux fans d'un spectacle ou aux spectateurs d'une séance. Le message est rangé dans la collection `envois` et part dans les 5 minutes (outils/notifier.mjs).
+- **Évolution** : nombre d'abonnés et d'espaces, relevé chaque jour vers 10 h (collection `stats`).
+- **Notifications ouvertes** : envoyées et touchées par type, sur 90 jours (collection `ouvertures`, anonyme).
+- **Exporter les avis** : fichier tableur (CSV) de toutes les notes et commentaires.
+- **Alertes techniques** : bouton « Recevoir les alertes sur cet appareil ». Si la synchro horaire du programme ne tourne plus depuis 3 h ou signale une erreur (fichier site/synchro.json, réécrit à chaque passage), une notification est envoyée aux appareils de l'équipe, puis une autre quand elle repart.
+
+Ces collections demandent les règles de `firestore.rules` (à recoller dans Firebase > Firestore > Règles, puis Publier).
+
+## Rappels choisis par le spectateur
+
+Dans « Mon espace », chacun choisit ses rappels : la veille (vers 10 h), le jour J une heure avant (« Dans 1 h : … ») et le lendemain (« Vous avez aimé ? », seulement s'il n'a pas encore noté le spectacle).

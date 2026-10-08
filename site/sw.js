@@ -3,7 +3,9 @@
 // 2) Reçoit les notifications envoyées par l'équipe depuis Firebase (Cloud Messaging).
 // Stratégie « réseau d'abord » : on affiche toujours la version la plus récente,
 // et la dernière version enregistrée sert seulement quand il n'y a pas de connexion.
-const CACHE = "chariot-v2";
+const CACHE = "chariot-v3", EXT = "chariot-ext-v1";
+// Fichiers gardés dès l'installation, pour que l'appli s'ouvre même sans réseau
+const CORE = ["./", "index.html", "shows.js", "firebase-config.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "badge-96.png"];
 
 // Affichage des notifications avec l'icône du Chariot (la roue sur fond rose), y compris pour
 // les messages écrits à la main dans la console Firebase, qui n'indiquent pas d'icône.
@@ -37,8 +39,10 @@ try {
   }
 } catch (e) { /* hors ligne ou Firebase indisponible : l'appli fonctionne quand même */ }
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
+self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).catch(() => {})); });
+self.addEventListener("activate", e => e.waitUntil(
+  caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== EXT).map(k => caches.delete(k)))).then(() => self.clients.claim())
+));
 
 // Toucher une notification ouvre l'appli (ou la remet au premier plan).
 self.addEventListener("notificationclick", e => {
@@ -50,15 +54,27 @@ self.addEventListener("notificationclick", e => {
   }));
 });
 
+// Affiches du site Wix, polices et bibliothèques : gardées en mémoire (affichage immédiat, et hors connexion).
+const EXT_HOSTS = ["static.wixstatic.com", "fonts.googleapis.com", "fonts.gstatic.com", "cdnjs.cloudflare.com"];
 self.addEventListener("fetch", e => {
   const req = e.request;
-  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) {
+    if (!EXT_HOSTS.includes(url.hostname)) return;
+    e.respondWith(caches.open(EXT).then(c => c.match(req).then(hit => {
+      const net = fetch(req).then(res => { if (res && (res.ok || res.type === "opaque")) c.put(req, res.clone()); return res; }).catch(() => hit);
+      return hit || net;
+    })));
+    return;
+  }
+  // Pages et données de l'appli : réseau d'abord (toujours la dernière version), sinon la copie gardée.
   e.respondWith(
     fetch(req)
       .then(res => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
         return res;
       })
-      .catch(() => caches.match(req).then(r => r || caches.match("./")))
+      .catch(() => caches.match(req, { ignoreSearch: req.mode === "navigate" }).then(r => r || caches.match("./")))
   );
 });
