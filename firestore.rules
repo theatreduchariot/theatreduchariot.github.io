@@ -69,6 +69,14 @@ service cloud.firestore {
       allow read, write: if isAdmin() && request.auth.uid == uid;
     }
 
+    // Séances complètes cochées par l'équipe (page admin) : lues par l'appli de tout le monde.
+    match /config/complets {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['full', 'par', 'at'])
+        && request.resource.data.full is map && request.resource.data.full.size() <= 500;
+    }
+
     // Tout le reste est fermé.
     match /{document=**} {
       allow read, write: if false;

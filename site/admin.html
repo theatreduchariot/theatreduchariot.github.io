@@ -59,7 +59,7 @@ textarea{min-height:80px;resize:vertical}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,getDocs,addDoc,doc,setDoc,query,where,orderBy,limit,serverTimestamp,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,getDocs,getDoc,addDoc,doc,setDoc,query,where,orderBy,limit,serverTimestamp,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getMessaging,getToken,isSupported} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $=id=>document.getElementById(id);
@@ -110,18 +110,32 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
   // Une partie qui échoue (ex. règles pas encore publiées) n'empêche pas le reste de s'afficher
   const safe=async(f,d)=>{try{return await f()}catch(e){console.warn(e);return d}};
   const RULES_MSG=`<p class="err small">Cette partie a besoin des nouvelles règles Firestore (Firestore &gt; Règles &gt; Publier).</p>`;
-  let exportRows=[];
+  let exportRows=[],fullMap={};
+  const isFull=(s,x)=>{const v=fullMap[s.id+"|"+x];return v===true||(v!==false&&(s.full||[]).includes(x))};
+
+  // ----- séances complètes (cochées par l'équipe) -----
+  function completsHTML(m){
+    if(m===null)return `<div class="card"><h2>Séances complètes</h2>${RULES_MSG}</div>`;
+    const now=new Date();
+    return `<div class="card"><h2>Séances complètes</h2>
+      <p class="small muted">Cochez une séance dès qu'elle est complète : l'appli affiche « Complet » aussitôt, et les fans du spectacle sont prévenus. Décochez-la si des places se libèrent : les personnes qui avaient demandé « Prévenez-moi » reçoivent une notification. Enregistré dès que vous cochez.</p>
+      ${upcoming.map(s=>{const xs=s.sessions.filter(x=>sesDate(x)>now);return `<details><summary>${esc(s.t)} <span class="muted" style="font-weight:400">(${xs.filter(x=>isFull(s,x)).length}/${xs.length} complète${xs.length>1?"s":""})</span></summary>
+        <div style="display:grid;gap:6px;margin-top:8px">${xs.map(x=>`<label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" data-full="${esc(s.id+"|"+x)}" ${isFull(s,x)?"checked":""} style="width:20px;height:20px;accent-color:var(--accent)"> ${label(x)}</label>`).join("")}</div></details>`}).join("")}
+      <p class="small" id="full-st"></p></div>`;
+  }
 
   async function load(){
     $("status").textContent="Chargement…";
     try{
       const snap=await getDocs(collection(db,"votes"));
-      const [statsDocs,envois,opens,synchro]=await Promise.all([
+      const [statsDocs,envois,opens,synchro,complets]=await Promise.all([
         safe(async()=>(await getDocs(collection(db,"stats"))).docs.map(d=>d.data()).sort((a,b)=>String(a.jour).localeCompare(String(b.jour))),null),
         safe(async()=>(await getDocs(query(collection(db,"envois"),orderBy("creeLe","desc"),limit(15)))).docs.map(d=>({id:d.id,...d.data()})),null),
         safe(async()=>(await getDocs(query(collection(db,"ouvertures"),where("at",">=",Timestamp.fromMillis(Date.now()-90*864e5))))).docs.map(d=>d.data()),null),
-        safe(async()=>{const r=await fetch("synchro.json?t="+Date.now(),{cache:"no-store"});return r.ok?await r.json():null},null)
+        safe(async()=>{const r=await fetch("synchro.json?t="+Date.now(),{cache:"no-store"});return r.ok?await r.json():null},null),
+        safe(async()=>{const d=await getDoc(doc(db,"config","complets"));return (d.exists()&&d.data().full)||{}},null)
       ]);
+      fullMap=complets||{};
 
       // ----- votes : par spectacle -----
       const stats={};SHOWS.forEach(s=>stats[s.id]={favs:0,go:new Set(),ses:{},notes:[],txt:[]});
@@ -147,6 +161,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
         <div class="card kpi"><span class="label">Favoris au total</span><b>${totF}</b></div>
         <div class="card kpi"><span class="label">« J'y vais » au total</span><b>${totG}</b></div>
         <div class="card kpi"><span class="label">Avis reçus</span><b>${rows.reduce((a,r)=>a+r.notes.length,0)}</b></div></div>
+      ${completsHTML(complets)}
       ${sendHTML(envois,opens)}
       ${chartHTML(statsDocs)}
       ${opensHTML(statsDocs,opens)}
@@ -229,6 +244,17 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
   }
 
   function wire(){
+    document.querySelectorAll("[data-full]").forEach(cb=>cb.onchange=async()=>{
+      const k=cb.dataset.full,[id,x]=k.split("|"),s=byId[id],st=$("full-st");
+      const inData=(s.full||[]).includes(x),next={...fullMap};
+      if(cb.checked===inData)delete next[k];else next[k]=cb.checked;
+      cb.disabled=true;st.textContent="Enregistrement…";
+      try{await setDoc(doc(db,"config","complets"),{full:next,par:auth.currentUser.email||"",at:serverTimestamp()});fullMap=next;
+        st.textContent=(cb.checked?"✓ "+s.t+", "+label(x)+" : complet.":"✓ "+s.t+", "+label(x)+" : de nouveau des places.")+" C'est visible dans l'appli à la prochaine ouverture.";
+        const sum=cb.closest("details").querySelector("summary span"),boxes=[...cb.closest("details").querySelectorAll("[data-full]")];sum.textContent=`(${boxes.filter(b=>b.checked).length}/${boxes.length} complète${boxes.length>1?"s":""})`;
+      }catch(e){cb.checked=!cb.checked;st.textContent=e.code==="permission-denied"?"Refusé : publiez d'abord les nouvelles règles Firestore.":"Erreur : "+e.message}
+      cb.disabled=false;
+    });
     const ty=$("n-type"),sh=$("n-show"),se=$("n-ses");
     const fillSes=()=>{const s=byId[sh.value];se.innerHTML=s?s.sessions.filter(x=>sesDate(x)>new Date()).map(x=>`<option value="${esc(x)}">${label(x)}</option>`).join(""):""};
     ty.onchange=()=>{$("n-show-w").hidden=ty.value==="tous";$("n-ses-w").hidden=ty.value!=="seance";fillSes()};

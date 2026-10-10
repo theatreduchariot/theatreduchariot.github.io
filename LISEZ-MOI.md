@@ -126,3 +126,7 @@ Ces collections demandent les règles de `firestore.rules` (à recoller dans Fir
 ## Rappels choisis par le spectateur
 
 Dans « Mon espace », chacun choisit ses rappels : la veille (vers 10 h), le jour J une heure avant (« Dans 1 h : … ») et le lendemain (« Vous avez aimé ? », seulement s'il n'a pas encore noté le spectacle).
+
+## Séances complètes
+
+Le site Wix ne signale une séance complète qu'en grisant la date dans le calendrier de réservation, ce que la mise à jour automatique ne peut pas lire. L'équipe coche donc les séances complètes sur la page admin (carte « Séances complètes », document Firestore `config/complets`). L'appli les affiche à l'ouverture, et l'envoi automatique prévient les fans (« ça part vite ») ou, quand on décoche, les personnes qui attendaient une place.

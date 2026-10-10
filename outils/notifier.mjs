@@ -43,6 +43,14 @@ export function loadShows(path = "site/shows.js") {
   vm.runInNewContext(fs.readFileSync(path, "utf8") + "\n;this.SHOWS=SHOWS;this.Y=Y;", ctx);
   return { SHOWS: ctx.SHOWS.filter(s => !s.arch && Array.isArray(s.sessions)), Y: ctx.Y };
 }
+// Séances complètes cochées par l'équipe : { "id|MM-JJ HH:MM": true | false }
+export function applyComplets(SHOWS, m) {
+  for (const s of SHOWS) {
+    const f = new Set(s.full || []);
+    for (const k of s.sessions) { const v = m[s.id + "|" + k]; if (v === true) f.add(k); else if (v === false) f.delete(k); }
+    s.full = s.sessions.filter(k => f.has(k));
+  }
+}
 const snapOf = SHOWS => Object.fromEntries(SHOWS.map(s => [s.id, { sessions: [...s.sessions], full: [...(s.full || [])] }]));
 
 // Ce qui est à faire à ce passage (pour ne lire les abonnés que si nécessaire)
@@ -188,6 +196,8 @@ async function main() {
   const test = process.env.NOTIF_TEST === "true", rappel = process.env.NOTIF_RAPPEL === "true";
 
   const { SHOWS, Y } = loadShows();
+  // Séances complètes cochées par l'équipe sur la page admin
+  try { applyComplets(SHOWS, ((await db.doc("config/complets").get()).data() || {}).full || {}); } catch (e) { console.log("Séances complètes non lues : " + e.message); }
   const ref = db.doc("etat/notifs");
   const snapState = await ref.get();
   const state = snapState.exists ? snapState.data() : null;

@@ -348,7 +348,7 @@ main();
 <script type="module">
 import {initializeApp,getApps,getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,setDoc,deleteDoc,addDoc,collection,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,deleteDoc,addDoc,collection,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // Envoi anonyme vers Firestore (aucun nom n'est envoyé) :
 //  - votes/{uid} : favoris et « J'y vais » (statistiques), seulement si « Mon espace » est créé ;
 //  - tokens/{uid} : adresse de notification du téléphone (si les notifications sont activées),
@@ -373,6 +373,16 @@ if(cfg&&cfg.apiKey&&!cfg.apiKey.startsWith("A_REMPLACER")){
       }
     };
     window.chariotSync=()=>{clearTimeout(timer);timer=setTimeout(push,800)};
+    // Séances complètes cochées par l'équipe sur la page admin (config/complets) :
+    // { full: { "idSpectacle|MM-JJ HH:MM": true (complet) ou false (places de nouveau en vente) } }
+    const CK="chariot-complets";
+    const base={};try{SHOWS.forEach(x=>base[x.id]=(x.full||[]).slice())}catch(e){}
+    const applyFull=m=>{try{let ch=false;SHOWS.forEach(x=>{if(!x.sessions)return;const f=new Set(base[x.id]||[]);
+        x.sessions.forEach(k=>{const v=m[x.id+"|"+k];if(v===true)f.add(k);else if(v===false)f.delete(k)});
+        const nf=x.sessions.filter(k=>f.has(k));if(JSON.stringify(nf)!==JSON.stringify(x.full||[])){x.full=nf;ch=true}});
+      if(ch&&typeof render==="function")render()}catch(e){console.warn(e)}};
+    try{const c=JSON.parse(localStorage.getItem(CK)||"null");if(c)applyFull(c)}catch(e){}
+    getDoc(doc(db,"config","complets")).then(d=>{const m=(d.exists()&&d.data().full)||{};try{localStorage.setItem(CK,JSON.stringify(m))}catch(e){}applyFull(m)}).catch(e=>console.warn("Séances complètes non lues",e));
     // Ouverture depuis une notification (?n=type) : compteur anonyme pour les statistiques
     const logOpen=async()=>{try{const q=new URLSearchParams(location.search),n=q.get("n");if(!n)return;const k="chariot-n-"+location.search;if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");
       await addDoc(collection(db,"ouvertures"),{n:n.slice(0,60),at:serverTimestamp()});q.delete("n");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash)}catch(e){console.warn("Ouverture non comptée",e)}};
