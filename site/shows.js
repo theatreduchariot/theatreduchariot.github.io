@@ -23,7 +23,7 @@ const SHOWS=[
   sessions:["10-17 21:00","10-18 21:00"]},
  {id:"augustin",img:"https://static.wixstatic.com/media/79b2f8_835e4335123945e08f2035354bb37414~mv2.jpg",t:"Augustin Émile",by:"Simon Alopé",genre:"Théâtre récit",age:"Dès 13 ans",dur:"50 min",s:"10-19",e:"10-27",p:"#5a6b2e",url:"/spectacles/augustin-%C3%A9mile",book:BILLET+"/s/6a46795b40ea4ebb998807d6",
   d:"« L'histoire qui nous lie aujourd'hui – et dont je vais faire récit – est celle de cet arrière-grand-père, que je ne connais pas vraiment ou de comment nous nous sommes rencontrés dans une boîte à biscuit. »",
-  credits:[["Écriture et interprétation","Simon Alopé"],["Collaboration artistique et technique","Clémentine Pradier"],["Regards complices","Chloé Vivarès, Lucie Vérot Solaure, Sultan Ulutas Alopé"]],
+  credits:[["Écriture et interprétation","Simon Alopé"],["Collaboration artistique et technique","Clémentine Pradier"],["Collaboration artistique","Chloé Vivarès, Lucie Vérot Solaure, Sultan Ulutas Alopé"],["Production","Cie Grand Chêne Chevelü"]],
   sessions:["10-19 19:00","10-20 19:00","10-26 19:00","10-27 19:00"]},
  {id:"onferaavec",img:"https://static.wixstatic.com/media/79b2f8_8aca0e785cf544da977505cfe7b03169~mv2.png",t:"On fera avec",by:"Tristan Cottin & Valentine Lebrun",genre:"Comédie",age:"Dès 10 ans",dur:"1h10",s:"10-22",e:"11-08",p:"#b0275a",url:"/spectacles/on-fera-avec",book:BILLET+"/s/6a467709ee06e1d6609c965e",
   d:"Une troupe amateur monte un Roméo et Juliette trop ambitieux, mais un imprévu vient tout bouleverser.",
