@@ -401,6 +401,13 @@ td input{min-width:90px}
       <div class="row" style="align-items:flex-end"><label class="f" style="flex:3 1 220px">Adresse Gmail<input type="email" id="staffMail" placeholder="prenom.nom@gmail.com"></label><button class="btn primary" id="btnStaff" type="button" style="flex:0 0 auto">Ajouter</button></div>
       <span class="note" id="staffMsg"></span>
     </div>
+
+    <div class="panel" id="importPanel" hidden>
+      <h2>Importer l'ancienne billetterie</h2>
+      <p class="note">Choisissez le fichier de sauvegarde (.json) exporté depuis la billetterie claude.ai. Les pièces, réservations, clients et tarifs sont recopiés avec leurs identifiants : importer deux fois le même fichier ne crée pas de doublons.</p>
+      <div class="row" style="align-items:center"><input type="file" id="importFile" accept=".json,application/json" style="flex:2 1 220px"><button class="btn primary" id="btnImport" type="button" style="flex:0 0 auto">Importer</button></div>
+      <span class="note" id="importMsg" style="white-space:pre-line"></span>
+    </div>
   </section>
 </div>
 
@@ -1347,7 +1354,7 @@ render();
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,collection,doc,getDoc,setDoc,updateDoc,deleteDoc,addDoc,onSnapshot,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,collection,doc,getDoc,setDoc,updateDoc,deleteDoc,addDoc,onSnapshot,getDocs,serverTimestamp,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const $=id=>document.getElementById(id);
 const ADMINS=["lechariot.contact@gmail.com","rgo071028@gmail.com"];
 // Instance séparée de l'appli publique : la connexion du personnel ne touche pas aux spectateurs.
@@ -1390,6 +1397,30 @@ onAuthStateChanged(auth,async u=>{
         const t=document.createElement("span");t.textContent=d.id;const b=document.createElement("button");b.className="btn small danger";b.type="button";b.textContent="Retirer";b.style.flex="0 0 auto";
         b.onclick=async()=>{if(!confirm("Retirer l'accès de "+d.id+" ?"))return;await deleteDoc(doc(db,"personnel",d.id));draw()};row.append(t,b);list.append(row)})};
     draw().catch(()=>{});
+    // Import d'une sauvegarde de l'ancienne billetterie
+    $("importPanel").hidden=false;
+    $("btnImport").onclick=async()=>{
+      const f=$("importFile").files[0],m=$("importMsg");if(!f){m.textContent="Choisissez d'abord le fichier.";return}
+      let data;try{data=JSON.parse(await f.text())}catch(e){m.textContent="Ce fichier n'est pas une sauvegarde lisible (JSON).";return}
+      // Formats acceptés : {spectacles:[...]} ou {spectacles:{id:{...}}}, chaque élément avec son id (id, doc_id ou _id), éventuellement sous data/fields.
+      const norm=v=>{const out=[];const one=(id,o)=>{if(!o||typeof o!=="object")return;const d=o.data&&typeof o.data==="object"?o.data:o.fields&&typeof o.fields==="object"?o.fields:o;const k=id||o.id||o.doc_id||o._id;if(!k)return;const c={...d};delete c.id;delete c.doc_id;delete c._id;delete c.version;out.push([String(k),c])};
+        if(Array.isArray(v))v.forEach(o=>one(null,o));else if(v&&typeof v==="object")Object.entries(v).forEach(([k,o])=>one(k,o));return out};
+      const src=data.collections||data;
+      const cols=["spectacles","reservations","clients"],todo=[];
+      for(const c of cols)for(const[id,o]of norm(src[c]))todo.push([c+"/"+id,o]);
+      const conf=src.config||{};
+      if(conf.tarifs)todo.push(["config/tarifs",conf.tarifs.data||conf.tarifs]);
+      else if(Array.isArray(conf))norm(conf).forEach(([id,o])=>todo.push(["config/"+id,o]));
+      if(src.tarifs)todo.push(["config/tarifs",src.tarifs.data||src.tarifs]);
+      if(!todo.length){m.textContent="Rien à importer dans ce fichier (il faut des listes spectacles, reservations, clients ou config).";return}
+      const n=c=>todo.filter(([p])=>p.startsWith(c+"/")).length;
+      if(!confirm("Importer "+n("spectacles")+" représentation(s), "+n("reservations")+" réservation(s), "+n("clients")+" client(s)"+(n("config")?" et les tarifs":"")+" ?"))return;
+      $("btnImport").disabled=true;m.textContent="Import en cours…";
+      try{for(let i=0;i<todo.length;i+=400){const b=writeBatch(db);for(const[p,o]of todo.slice(i,i+400))b.set(doc(db,...P(p)),o);await b.commit();m.textContent="Import en cours… "+Math.min(todo.length,i+400)+" / "+todo.length}
+        m.textContent="✓ Import terminé : "+n("spectacles")+" représentation(s), "+n("reservations")+" réservation(s), "+n("clients")+" client(s)"+(n("config")?", tarifs":"")+".";}
+      catch(e){m.textContent="Import interrompu : "+(e.code||e.message)+". Vous pouvez relancer : rien ne sera doublé."}
+      $("btnImport").disabled=false;
+    };
     $("btnStaff").onclick=async()=>{const m=$("staffMail").value.trim().toLowerCase();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){$("staffMsg").textContent="Adresse invalide.";return}
       try{await setDoc(doc(db,"personnel",m),{ajoutePar:u.email,at:serverTimestamp()});$("staffMail").value="";$("staffMsg").textContent="✓ "+m+" peut maintenant ouvrir la billetterie.";draw()}catch(e){$("staffMsg").textContent="Refusé : "+(e.code||e.message)}};
   }
