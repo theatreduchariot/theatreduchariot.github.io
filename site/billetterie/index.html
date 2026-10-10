@@ -368,6 +368,7 @@ td input{min-width:90px}
           <tbody id="showTable"></tbody>
         </table>
       </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn" id="btnDedup" type="button">Fusionner les dates en double</button><span class="note" id="dedupMsg"></span></div>
       <h3 style="margin-top:18px">Ajouter une pièce</h3>
       <div class="row">
         <label class="f" style="flex:3 1 220px">Titre<input type="text" id="nTitre" placeholder="ex. Le Malade imaginaire"></label>
@@ -1154,7 +1155,7 @@ function renderReglages(){
     pt.replaceChildren();
     for(const[k,label]of TARIFS)pt.append(priceRow(k,label,k==="invitation"?0:(state.prices[k]||0)));
   }
-  $("btnAddShow").disabled=$("btnSavePrices").disabled=$("btnAddTarif").disabled=!state.canWrite;
+  $("btnDedup").disabled=$("btnAddShow").disabled=$("btnSavePrices").disabled=$("btnAddTarif").disabled=!state.canWrite;
 }
 
 function priceRow(k,label,prix){
@@ -1308,6 +1309,36 @@ function syncErrText(e){
   if(c==="server_unavailable"||c==="upstream_error")return"Le service n'a pas répondu. Attendez une minute avant de réessayer : la mise à jour est peut-être déjà partie.";
   return"Le lancement n'a pas abouti ("+(c||"erreur")+"). Réessayez dans un moment.";
 }
+const normT=t=>(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+const sameShow=(a,b)=>{if(a.date!==b.date||(a.heure||"")!==(b.heure||""))return false;const x=normT(a.titre),y=normT(b.titre);return x===y||x.startsWith(y)||y.startsWith(x)||x.slice(0,8)===y.slice(0,8)};
+async function runDedup(){
+  const msg=$("dedupMsg");if(!state.db||!state.canWrite)return;
+  const groups=[],seen=new Set();
+  for(const s of state.shows){if(seen.has(s.id))continue;const g=state.shows.filter(x=>!seen.has(x.id)&&sameShow(s,x));g.forEach(x=>seen.add(x.id));if(g.length>1)groups.push(g)}
+  if(!groups.length){msg.textContent="Aucune date en double.";return}
+  const nR=id=>state.resas.filter(r=>r.spectacleId===id||r.eventimOrigine===id).length;
+  // On garde la fiche qui a le plus de réservations (puis celle qui a des ventes Eventim, puis la plus complète)
+  const score=x=>nR(x.id)*1000+((+x.eventimVendus||0)>0?100:0)+Object.keys(x).length;
+  if(!confirm(groups.length+" représentation"+(groups.length>1?"s":"")+" en double :\n"+groups.slice(0,12).map(g=>"• "+g[0].titre+" — "+g[0].date+" "+(g[0].heure||"")).join("\n")+(groups.length>12?"\n…":"")+"\n\nFusionner ? Les réservations sont regroupées sur une seule fiche."))return;
+  $("btnDedup").disabled=true;msg.textContent="Fusion en cours…";let done=0;
+  try{
+    for(const g of groups){
+      g.sort((a,b)=>score(b)-score(a));const keep=g[0],drop=g.slice(1);
+      const evt=Math.max(...g.map(x=>+x.eventimVendus||0)),ch={};
+      if(evt>(+keep.eventimVendus||0))ch.eventimVendus=evt;
+      if(!keep.jauge){const j=Math.max(...g.map(x=>+x.jauge||0));if(j)ch.jauge=j}
+      if(Object.keys(ch).length)await state.db.doc("spectacles/"+keep.id).update(ch);
+      for(const d of drop){
+        for(const r of state.resas.filter(r=>r.spectacleId===d.id||r.eventimOrigine===d.id)){const u={};if(r.spectacleId===d.id)u.spectacleId=keep.id;if(r.eventimOrigine===d.id)u.eventimOrigine=keep.id;await state.db.doc("reservations/"+r.id).update(u)}
+        await state.db.doc("spectacles/"+d.id).delete();if(state.sel===d.id)state.sel=keep.id;
+      }
+      done++;
+    }
+    msg.textContent="✓ "+done+" date"+(done>1?"s fusionnées":" fusionnée")+".";
+  }catch(e){msg.textContent="Fusion interrompue : "+dbErr(e)+" Relancez le bouton pour finir."}
+  $("btnDedup").disabled=false;
+}
+$("btnDedup").addEventListener("click",runDedup);
 async function runSync(){
   const btn=$("btnSync"),msg=$("syncMsg");
   if(!state.db||!state.canWrite)return;
@@ -1317,7 +1348,7 @@ async function runSync(){
     const P=new Function(txt+";return{SHOWS,Y}")();
     const today=todayStr(),have=new Set(state.shows.map(x=>x.titre+"|"+x.date+"|"+x.heure));
     const todo=[];
-    for(const sh of P.SHOWS){if(sh.arch||!sh.sessions)continue;for(const k of sh.sessions){const date=P.Y+"-"+k.slice(0,5),heure=k.slice(6);if(date<today||have.has(sh.t+"|"+date+"|"+heure))continue;todo.push({titre:sh.t,date,heure})}}
+    for(const sh of P.SHOWS){if(sh.arch||!sh.sessions)continue;for(const k of sh.sessions){const date=P.Y+"-"+k.slice(0,5),heure=k.slice(6);if(date<today||have.has(sh.t+"|"+date+"|"+heure)||state.shows.some(x=>sameShow(x,{titre:sh.t,date,heure})))continue;todo.push({titre:sh.t,date,heure})}}
     if(!todo.length){msg.textContent="Toutes les dates du programme sont déjà là.";btn.disabled=false;return}
     const j=parseInt(prompt(todo.length+" date"+(todo.length>1?"s":"")+" à ajouter ("+[...new Set(todo.map(x=>x.titre))].join(", ")+").\nJauge (nombre de places) pour ces dates ?",$("nJauge").value||"120"),10);
     if(!(j>0)){msg.textContent="Import annulé.";btn.disabled=false;return}
