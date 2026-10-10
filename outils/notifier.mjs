@@ -172,6 +172,7 @@ export function plan({ SHOWS, Y, state, tokens, now, votes = {} }) {
 export function targetsOf(envoi, tokens) {
   const c = envoi.cible || {};
   if (c.type === "spectacle") return tokens.filter(t => (t.favs || []).includes(c.id) || (t.plans || []).some(k => k.startsWith(c.id + "|"))).map(t => t.token);
+  if (c.type === "appareil") return typeof c.token === "string" && c.token ? [c.token] : [];
   if (c.type === "seance") return tokens.filter(t => (t.plans || []).includes(c.id + "|" + c.x)).map(t => t.token);
   return tokens.map(t => t.token);
 }
@@ -241,9 +242,11 @@ async function main() {
     }
   }
   if (test) messages.unshift({ kind: "test", to: "all", title: "Test du Chariot", body: "Les notifications automatiques fonctionnent. À bientôt au théâtre !", link: linkFor("test") });
+  let adminDocs = [];
   // Alertes techniques : appareils de l'équipe (collection admins)
   if (alerts.length) {
-    const adminTokens = (await db.collection("admins").get()).docs.map(d => d.get("token")).filter(Boolean);
+    adminDocs = (await db.collection("admins").get()).docs;
+    const adminTokens = adminDocs.map(d => d.get("token")).filter(Boolean);
     for (const a of alerts) if (adminTokens.length) messages.push({ kind: "alerte", to: adminTokens, title: a.title, body: a.body, link: APP + "admin.html" });
     note(`Surveillance : ${alerts.map(a => a.title).join(" / ")} → ${adminTokens.length} appareil(s) de l'équipe`);
   }
@@ -252,7 +255,7 @@ async function main() {
   const dead = new Set(), sentBy = {};
   for (const m of messages) {
     const to = m.to === "all" ? all : [...new Set(m.to)];
-    let ok = 0, ko = 0;
+    let ok = 0, ko = 0; const errs = {};
     for (let i = 0; i < to.length; i += 500) {
       const batch = to.slice(i, i + 500);
       const res = await fcm.sendEachForMulticast({
@@ -263,16 +266,17 @@ async function main() {
       ok += res.successCount; ko += res.failureCount;
       res.responses.forEach((r, j) => {
         const c = r.error && r.error.code;
+        if (c) errs[c] = (errs[c] || 0) + 1;
         if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token" || c === "messaging/invalid-argument") dead.add(batch[j]);
       });
     }
     const k = m.kind.startsWith("e:") ? "equipe" : m.kind;
     sentBy[k] = (sentBy[k] || 0) + ok;
     if (m.envoi) await m.envoi.update({ statut: "envoyé", envoyes: ok, echecs: ko, envoyeLe: FV.serverTimestamp() }).catch(() => {});
-    note(`« ${m.title} » : ${ok} envoyé(s), ${ko} échec(s).`);
+    note(`« ${m.title} » : ${ok} envoyé(s), ${ko} échec(s)${ko ? " (" + Object.entries(errs).map(([k, v]) => k.replace("messaging/", "") + " ×" + v).join(", ") + ")" : ""}.`);
   }
   // Téléphones désabonnés : on efface leur adresse de notification
-  for (const d of tokDocs) if (dead.has(d.get("token"))) await d.ref.delete().catch(() => {});
+  for (const d of [...tokDocs, ...adminDocs]) if (dead.has(d.get("token"))) await d.ref.delete().catch(() => {});
   if (dead.size) console.log(`${dead.size} adresse(s) périmée(s) effacée(s).`);
 
   // Statistiques du jour (lues par la page admin)

@@ -161,6 +161,9 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
       <div class="card"><h2>Alertes techniques</h2>
         <p class="small muted">Recevez une notification sur ce téléphone si la mise à jour automatique du programme (toutes les heures) tombe en panne, puis quand elle repart. À faire une fois, depuis l'appli installée ou le navigateur du téléphone.</p>
         <div><button class="btn ghost" id="alerts">Recevoir les alertes sur cet appareil</button></div><p class="small" id="alerts-st"></p></div>
+      <div class="card"><h2>Tester les notifications sur ce téléphone</h2>
+        <p class="small muted">Deux essais : une notification affichée tout de suite par le téléphone lui-même, puis une vraie notification envoyée par le serveur (elle arrive en 5 à 25 minutes). Si la première n'apparaît pas, c'est le téléphone qui bloque les notifications.</p>
+        <div><button class="btn ghost" id="ntest">Lancer l'essai</button></div><p class="small" id="ntest-st" style="white-space:pre-line"></p></div>
       <p class="muted">Chiffres et avis anonymes : les commentaires peuvent être transmis aux compagnies. Un « J'y vais » est une intention notée par le spectateur, pas un billet acheté.</p>`;
       wire();
       $("status").textContent="Mis à jour le "+new Date().toLocaleString("fr-FR");
@@ -181,7 +184,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
   // ----- envoyer une notification -----
   function sendHTML(envois,opens){
     const oc={};(opens||[]).forEach(o=>{oc[o.n]=(oc[o.n]||0)+1});
-    const cib=c=>!c||c.type==="tous"?"Tout le monde":c.type==="spectacle"?"Fans de "+(byId[c.id]?byId[c.id].t:c.id):"Spectateurs du "+label(c.x)+" ("+(byId[c.id]?byId[c.id].t:c.id)+")";
+    const cib=c=>c&&c.type==="appareil"?"Essai sur un téléphone":!c||c.type==="tous"?"Tout le monde":c.type==="spectacle"?"Fans de "+(byId[c.id]?byId[c.id].t:c.id):"Spectateurs du "+label(c.x)+" ("+(byId[c.id]?byId[c.id].t:c.id)+")";
     return `<div class="card"><h2>Envoyer une notification</h2>
       <label class="f">Destinataires<select id="n-type"><option value="tous">Tous les abonnés</option><option value="spectacle">Les fans d'un spectacle (favori ou « J'y vais »)</option><option value="seance">Les spectateurs d'une séance (« J'y vais »)</option></select></label>
       <label class="f" id="n-show-w" hidden>Spectacle<select id="n-show">${upcoming.map(s=>`<option value="${esc(s.id)}">${esc(s.t)}</option>`).join("")}</select></label>
@@ -192,7 +195,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
       <div class="row"><span class="small muted">Envoi dans les 5 minutes. Toucher la notification ouvre l'appli.</span><button class="btn" id="n-send">Envoyer</button></div>
       <p class="small" id="n-st"></p>
       ${envois===null?RULES_MSG:envois.length?`<details><summary>Derniers envois (${envois.length})</summary><div class="scroll"><table><thead><tr><th>Message</th><th>Destinataires</th><th class="n">Reçus</th><th class="n">Ouverts</th></tr></thead><tbody>
-        ${envois.map(e=>`<tr><td><b>${esc(e.titre||"")}</b><div class="small muted">${esc(e.texte||"")}</div><div class="small muted">${fmtTs(e.creeLe)}${e.par?" · "+esc(e.par):""}</div></td><td class="small">${esc(cib(e.cible))}</td><td class="n">${e.statut==="envoyé"?(e.envoyes||0):`<span class="muted" style="font-weight:400">${esc(e.statut||"")}</span>`}</td><td class="n">${oc["e:"+e.id]||0}</td></tr>`).join("")}
+        ${envois.map(e=>`<tr><td><b>${esc(e.titre||"")}</b><div class="small muted">${esc(e.texte||"")}</div><div class="small muted">${fmtTs(e.creeLe)}${e.par?" · "+esc(e.par):""}</div></td><td class="small">${esc(cib(e.cible))}</td><td class="n">${e.statut==="envoyé"?(e.envoyes||0)+(e.echecs?` <span class="muted" style="font-weight:400">(${e.echecs} échec${e.echecs>1?"s":""})</span>`:""):`<span class="muted" style="font-weight:400">${esc(e.statut||"")}</span>`}</td><td class="n">${oc["e:"+e.id]||0}</td></tr>`).join("")}
       </tbody></table></div></details>`:""}
     </div>`;
   }
@@ -252,6 +255,26 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
       const txt="﻿"+[["Spectacle","Note","Commentaire"],...exportRows.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))||b[1]-a[1])].map(r=>r.map(q).join(";")).join("\r\n");
       const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download="avis-chariot-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove();
     };
+    // Essai complet des notifications sur l'appareil utilisé
+    $("ntest").onclick=async()=>{
+      const st=$("ntest-st"),L=[];const w=t=>{L.push(t);st.textContent=L.join("\n")};
+      try{
+        if(!("Notification" in window)||!(await isSupported())){w("✗ Ce navigateur ne gère pas les notifications. Sur iPhone : ouvrez cette page depuis l'appli installée sur l'écran d'accueil.");return}
+        w("Autorisation du navigateur : "+({granted:"accordée",denied:"refusée",default:"pas encore demandée"}[Notification.permission]||Notification.permission));
+        if(Notification.permission!=="granted"&&await Notification.requestPermission()!=="granted"){w("✗ Notifications refusées pour ce site : Réglages du téléphone > Applications > Chrome (ou l'appli du Chariot) > Notifications, puis réessayez.");return}
+        const reg=await navigator.serviceWorker.register("sw.js");await navigator.serviceWorker.ready;
+        await reg.showNotification("Essai 1 : le téléphone",{body:"Si vous voyez ceci, le téléphone affiche bien les notifications du Chariot.",icon:"icon-192.png",badge:"badge-96.png",tag:"essai-local"});
+        w("✓ Essai 1 envoyé : une notification doit apparaître maintenant. Sinon, le téléphone la bloque (notifications de Chrome ou de l'appli désactivées, mode Ne pas déranger, économie de batterie).");
+        const token=await getToken(getMessaging(app),{vapidKey:self.FIREBASE_VAPID_KEY,serviceWorkerRegistration:reg});
+        if(!token){w("✗ Impossible d'obtenir l'adresse de notification de ce téléphone.");return}
+        w("Adresse de notification : "+token.slice(0,10)+"…");
+        await setDoc(doc(db,"admins",auth.currentUser.uid),{token,email:auth.currentUser.email||"",at:serverTimestamp()});
+        await addDoc(collection(db,"envois"),{titre:"Essai 2 : le serveur",texte:"Les notifications du Chariot arrivent bien sur ce téléphone.",cible:{type:"appareil",token},statut:"en attente",par:auth.currentUser.email||"",creeLe:serverTimestamp()});
+        w("✓ Essai 2 demandé : la notification « Essai 2 : le serveur » doit arriver dans 5 à 25 minutes, même appli fermée. Elle apparaîtra aussi dans « Derniers envois » avec son résultat.");
+      }catch(e){w("✗ Erreur : "+(e.code||"")+" "+(e.message||e))}
+    };
+    // Alertes déjà activées sur ce téléphone : on garde l'adresse à jour à chaque visite
+    (async()=>{try{if(localStorage.getItem("chariot-admin-alertes")&&Notification.permission==="granted"&&await isSupported()){const reg=await navigator.serviceWorker.register("sw.js");await navigator.serviceWorker.ready;const token=await getToken(getMessaging(app),{vapidKey:self.FIREBASE_VAPID_KEY,serviceWorkerRegistration:reg});if(token)await setDoc(doc(db,"admins",auth.currentUser.uid),{token,email:auth.currentUser.email||"",at:serverTimestamp()})}}catch(e){}})();
     $("alerts").onclick=async()=>{
       const st=$("alerts-st");st.textContent="Activation…";
       try{
@@ -260,6 +283,7 @@ if(!cfg||!cfg.apiKey||cfg.apiKey.startsWith("A_REMPLACER")){
         const reg=await navigator.serviceWorker.register("sw.js");await navigator.serviceWorker.ready;
         const token=await getToken(getMessaging(app),{vapidKey:self.FIREBASE_VAPID_KEY,serviceWorkerRegistration:reg});
         await setDoc(doc(db,"admins",auth.currentUser.uid),{token,email:auth.currentUser.email||"",at:serverTimestamp()});
+        try{localStorage.setItem("chariot-admin-alertes","1")}catch(e){}
         st.textContent="✓ Cet appareil recevra les alertes techniques.";
       }catch(e){st.textContent=e.code==="permission-denied"?"Refusé : publiez d'abord les nouvelles règles Firestore.":"Erreur : "+(e.message||e)}
     };
