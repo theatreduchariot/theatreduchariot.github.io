@@ -51,6 +51,21 @@ export function applyComplets(SHOWS, m) {
     s.full = s.sessions.filter(k => f.has(k));
   }
 }
+// ---------- billetterie de l'accueil : ajout automatique des représentations du programme ----------
+const normT = t => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+export const sameShow = (a, b) => { if (a.date !== b.date || (a.heure || "") !== (b.heure || "")) return false; const x = normT(a.titre), y = normT(b.titre); return x === y || x.startsWith(y) || y.startsWith(x) || x.slice(0, 8) === y.slice(0, 8); };
+// existing : [{titre,date,heure,jauge}] déjà dans la billetterie → renvoie les représentations à créer
+export function billetToAdd({ SHOWS, Y, existing, today }) {
+  const add = [];
+  const jaugeOf = t => { const same = existing.filter(x => normT(x.titre).slice(0, 8) === normT(t).slice(0, 8) && +x.jauge > 0); if (same.length) return +same[same.length - 1].jauge;
+    const c = {}; existing.forEach(x => { if (+x.jauge > 0) c[x.jauge] = (c[x.jauge] || 0) + 1; }); const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; return best ? +best[0] : 120; };
+  for (const s of SHOWS) for (const k of s.sessions) {
+    const r = { titre: s.t, date: `${Y}-${k.slice(0, 5)}`, heure: k.slice(6) };
+    if (r.date < today || existing.some(x => sameShow(x, r)) || add.some(x => sameShow(x, r))) continue;
+    add.push({ ...r, jauge: jaugeOf(s.t), source: "programme" });
+  }
+  return add;
+}
 const snapOf = SHOWS => Object.fromEntries(SHOWS.map(s => [s.id, { sessions: [...s.sessions], full: [...(s.full || [])] }]));
 
 // Ce qui est à faire à ce passage (pour ne lire les abonnés que si nécessaire)
@@ -222,6 +237,19 @@ async function main() {
       nextState0.syncBad = false; delete nextState0.syncAlertAt;
     }
   }
+
+  // Billetterie : quand le programme change (ou une fois par jour), on y ajoute les nouvelles représentations
+  try {
+    const sig = JSON.stringify(SHOWS.map(s => [s.t, s.sessions]));
+    if (nextState0.billetSig !== sig || nextState0.billetDay !== now.day) {
+      const col = db.collection("billetterie").doc("main").collection("spectacles");
+      const existing = (await col.get()).docs.map(d => d.data());
+      const add = billetToAdd({ SHOWS, Y, existing, today: now.day });
+      for (const r of add) await col.add({ ...r, creeLe: new Date().toISOString() });
+      if (add.length) note(`Billetterie : ${add.length} représentation(s) ajoutée(s) depuis le programme (${[...new Set(add.map(r => r.titre))].join(", ")}).`);
+      nextState0.billetSig = sig; nextState0.billetDay = now.day;
+    }
+  } catch (e) { console.log("Billetterie non synchronisée : " + e.message); }
 
   if (!todo.changed && !todo.daily && !todo.jourj && !pending.length && !alerts.length && !test && !rappel) {
     if (JSON.stringify(nextState0) !== JSON.stringify(state || {})) await ref.set(nextState0);
