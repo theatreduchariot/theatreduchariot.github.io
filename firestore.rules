@@ -77,6 +77,20 @@ service cloud.firestore {
         && request.resource.data.full is map && request.resource.data.full.size() <= 500;
     }
 
+    // Billetterie de l'accueil (site/billetterie) : personnel seulement.
+    function isStaff() {
+      return isAdmin() || (request.auth != null && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/personnel/$(request.auth.token.email)));
+    }
+    match /billetterie/main/{document=**} {
+      allow read, write: if isStaff();
+    }
+    // Liste du personnel autorisé, gérée par les administrateurs.
+    match /personnel/{email} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
     // Tout le reste est fermé.
     match /{document=**} {
       allow read, write: if false;
