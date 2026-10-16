@@ -1102,17 +1102,20 @@ const mood=(label,txt,th,f,extra)=>({label,txt,empty:"Rien de prévu dans cette 
   get test(){return s=>!done(s)&&!!firstFuture(s)&&this.sc(s)>0},
   get sort(){return (a,b)=>this.sc(b)-this.sc(a)||firstFuture(a)-firstFuture(b)},
   when:s=>{const p=P(s.id);return [...(p.th||[]).filter(x=>th.includes(x)).map(x=>THEMES[x]),...(p.f||[]).filter(x=>f.includes(x)).map(x=>FORMATS[x])].slice(0,3).join(" · ")}});
+// Envies par discipline : le genre affiché sur le site et les formes de chaque spectacle
+const genreMood=(label,txt,re,f)=>{const m=mood(label,txt,[],f,s=>re.test(s.genre||"")?2:0);m.when=s=>s.genre||"";return m};
 const MOODS={
- rire:mood("😂 Rire","pour rire",["fete","convivialite"],["comedie","interactif"]),
- emu:mood("🥹 Être ému·e","pour être ému·e",["deuil","amour","rupture","memoire","vieillesse","solitude","parentalite"],["drame","poesie"]),
- reflechir:mood("🧠 Réfléchir","pour réfléchir",["engagement","femmes","histoire","numerique","soin","identite"],["docu"]),
- enfants:mood("🧸 Sortir avec les enfants","à voir avec les enfants",[],["jeune"],s=>{const a=minAge(s);return a!==null&&a<=8?2:0}),
- musique:mood("🎶 Musique et danse","en musique et en danse",[],["musique","danse","concert"]),
- voyager:mood("🌍 Voyager","pour voyager",["cultures","nature"],[]),
- rever:mood("✨ Rêver","pour rêver",["reve","creation"],["marionnette","poesie"])
+ theatre:genreMood("🎭 Théâtre","côté théâtre",/th[ée][âa]tre|com[ée]die|seul|r[ée]cit|drame/i,[]),
+ marionnettes:genreMood("🪆 Marionnettes","avec des marionnettes",/marionnette/i,["marionnette"]),
+ musique:genreMood("🎶 Musique","en musique",/musi|chanson|concert/i,["musique","concert"]),
+ danse:genreMood("💃 Danse","en danse",/danse/i,["danse"])
 };
 document.addEventListener("click",e=>{const t=e.target.closest("[data-moods]");if(!t)return;state.moodOpen=!state.moodOpen;if(!state.moodOpen&&(state.qf||"").startsWith("m:"))state.qf="";fillSearch()});
 Object.assign(I18N,{
+ "🎭 Théâtre":["🎭 Theatre","🎭 Teatro","🎭 Theater","🎭 Teatro","🎭 Театр"],
+ "🪆 Marionnettes":["🪆 Puppets","🪆 Marionetas","🪆 Puppenspiel","🪆 Marionette","🪆 Куклы"],
+ "🎶 Musique":["🎶 Music","🎶 Música","🎶 Musik","🎶 Musica","🎶 Музыка"],
+ "💃 Danse":["💃 Dance","💃 Danza","💃 Tanz","💃 Danza","💃 Танец"],
  "✨ J'ai envie de…":["✨ I feel like…","✨ Me apetece…","✨ Ich habe Lust auf…","✨ Ho voglia di…","✨ Хочется…"],
  "Envies":["Moods","Planes","Stimmungen","Voglie","Настроение"],
  "😂 Rire":["😂 Laughing","😂 Reír","😂 Lachen","😂 Ridere","😂 Посмеяться"],
@@ -1125,6 +1128,10 @@ Object.assign(I18N,{
  "Rien de prévu dans cette envie pour le moment.":["Nothing scheduled for this mood right now.","Nada programado para este plan por ahora.","Gerade nichts Passendes im Programm.","Niente in programma per questa voglia al momento.","Пока ничего подходящего."]
 });
 Object.assign(I18N_SUF,{
+ "côté théâtre":["theatre","de teatro","Theater","di teatro","театр"],
+ "avec des marionnettes":["with puppets","con marionetas","mit Puppen","con marionette","с куклами"],
+ "en musique":["with music","con música","mit Musik","in musica","с музыкой"],
+ "en danse":["with dance","con danza","mit Tanz","con danza","с танцем"],
  "pour rire":["to make you laugh","para reír","zum Lachen","per ridere","чтобы посмеяться"],
  "pour être ému·e":["to move you","para emocionarte","zum Mitfühlen","per emozionarti","чтобы растрогаться"],
  "pour réfléchir":["to make you think","para reflexionar","zum Nachdenken","per riflettere","чтобы задуматься"],
