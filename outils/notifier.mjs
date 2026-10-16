@@ -268,7 +268,7 @@ async function main() {
   if (alerts.length) {
     adminDocs = (await db.collection("admins").get()).docs;
     const adminTokens = adminDocs.map(d => d.get("token")).filter(Boolean);
-    for (const a of alerts) if (adminTokens.length) messages.push({ kind: "alerte", to: adminTokens, title: a.title, body: a.body, link: APP + "admin/" });
+    for (const a of alerts) if (adminTokens.length) messages.push({ kind: "alerte", to: adminTokens, title: a.title, body: a.body, link: "https://chariot-appli.web.app/" });
     note(`Surveillance : ${alerts.map(a => a.title).join(" / ")} → ${adminTokens.length} appareil(s) de l'équipe`);
   }
   note(`${all.length} téléphone(s) abonné(s), ${messages.length} message(s) à envoyer.`);

@@ -1,7 +1,7 @@
 # Mettre en ligne l'appli du Théâtre du Chariot
 
 > **Octobre 2026 : l'appli est maintenant hébergée sur GitHub Pages**, à l'adresse
-> https://theatreduchariot.github.io/ (statistiques : https://theatreduchariot.github.io/admin.html).
+> https://theatreduchariot.github.io/ (statistiques : https://chariot-appli.web.app (appli admin)).
 > Dépôt GitHub : theatreduchariot/theatreduchariot.github.io (ce nom exact donne l'adresse sans sous-dossier).
 > Le forfait gratuit de Netlify ne permet qu'une vingtaine de mises en ligne par mois, trop peu pour la synchro horaire.
 > La mise en ligne est faite par `.github/workflows/pages.yml` à chaque mise à jour de la branche `main`.
@@ -114,7 +114,7 @@ Les messages écrits à la main depuis Firebase → Messaging fonctionnent toujo
 
 ## Page admin : envoyer une notification, courbes, alertes
 
-Sur https://theatreduchariot.github.io/admin.html (connexion Google administrateur) :
+Sur https://chariot-appli.web.app (appli admin) (connexion Google administrateur) :
 - **Envoyer une notification** : à tous les abonnés, aux fans d'un spectacle ou aux spectateurs d'une séance. Le message est rangé dans la collection `envois` et part dans les 5 minutes (outils/notifier.mjs).
 - **Évolution** : nombre d'abonnés et d'espaces, relevé chaque jour vers 10 h (collection `stats`).
 - **Notifications ouvertes** : envoyées et touchées par type, sur 90 jours (collection `ouvertures`, anonyme).
