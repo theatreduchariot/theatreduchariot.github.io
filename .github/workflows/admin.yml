@@ -1,0 +1,54 @@
+# Met en ligne l'appli « Chariot Admin » sur son propre site (https://chariot-appli.web.app),
+# séparé de l'appli publique : Android peut ainsi l'installer comme une vraie deuxième appli.
+name: Mise en ligne de l'appli admin (Firebase Hosting)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: admin-hosting
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Préparer le site admin
+        run: |
+          rm -rf hosting && cp -r site hosting
+          cp site/admin/index.html hosting/index.html
+          cat > hosting/admin/manifest.webmanifest <<'JSON'
+          {
+            "id": "/",
+            "name": "Chariot · Admin",
+            "short_name": "Chariot Admin",
+            "description": "Statistiques, notifications et séances complètes de l'appli du Théâtre du Chariot (équipe)",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#000000",
+            "lang": "fr",
+            "icons": [
+              {"src": "/admin/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+              {"src": "/admin/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+            ]
+          }
+          JSON
+          cat > firebase.json <<'JSON'
+          {"hosting":{"public":"hosting","cleanUrls":false,
+            "headers":[{"source":"**","headers":[{"key":"Cache-Control","value":"no-cache"}]}]}}
+          JSON
+      - name: Envoyer sur Firebase Hosting
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx -y firebase-tools@13 deploy --only hosting --project chariot-appli --non-interactive 2>&1 | tee deploy.log
+          grep -q "Deploy complete" deploy.log && echo "::notice::Appli admin en ligne : https://chariot-appli.web.app" || { echo "::error::$(grep -iE 'error|denied|permission' deploy.log | head -3 | tr '\n' ' ')"; exit 1; }
