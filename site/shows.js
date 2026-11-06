@@ -281,7 +281,11 @@ const SHOWS=[
  {id:"parade",arch:true,img:"https://static.wixstatic.com/media/79b2f8_e2119bd1074f4095b8cf906d3c2dd288~mv2.jpg",t:"Parade (ballet réaliste)",by:"Arma Lux & Agathe Paré-Comont",age:"Dès 7 ans",periode:"2 et 3 avr.",p:"#4b6b55",url:"/spectacles/parade",
   d:"Dans un monde où la civilisation s'est effondrée, une femme-orchestre vient présenter son spectacle devant les derniers êtres humains. Sur la musique d'Erik Satie, d'après un argument de Jean Cocteau."},
  {id:"houle",arch:true,img:"https://static.wixstatic.com/media/79b2f8_b2c6be0772d24c4f982a41a73b7a36b4~mv2.png",t:"Houle",by:"Collectif FASP",age:"Dès 10 ans",periode:"4 – 26 avr.",p:"#6b3f55",url:"/spectacles/houle",
-  d:"Dans leur bazar organisé, deux conteuses aux allures bouffonnes nous racontent l'histoire de Houle, une jeune fille curieuse."}
+  d:"Dans leur bazar organisé, deux conteuses aux allures bouffonnes nous racontent l'histoire de Houle, une jeune fille curieuse."},
+ {id:"fanny",arch:true,img:"https://static.wixstatic.com/media/79b2f8_33dbcd349732486cbed7a1f316a60d32~mv2.png",t:"Fanny contre les vampires",by:"Agathe Joliet, avec Fanny Spinetta",age:"Dès 16 ans",periode:"7 – 8 nov.",p:"#5a2a3a",url:"/spectacles/fanny-contre-les-vampires",
+  d:"Seul en scène burlesque. Fanny a rencontré quelqu'un, il n'est vraiment pas comme les autres et pour cause : c'est un vampire."},
+ {id:"avaverden",arch:true,img:"https://static.wixstatic.com/media/79b2f8_ff85ea0598604199861b243984f0414d~mv2.png",t:"Ava's Verden",by:"Ava Hervier, compagnie Big Up",age:"Tous publics",periode:"1er – 15 déc.",p:"#2f4a6b",url:"/spectacles/ava's-verden",
+  d:"Entre la chanson réaliste, la house-music et le 8 bit, Ava's Verden offre au public un univers original, déjanté et merveilleux, entre concert et performance. C'est sensuel, tragique et drôle."}
 ];
 
 const PROFIL={
@@ -400,5 +404,7 @@ const PROFIL={
  troisfemmes:{th:["femmes","engagement"],f:["poesie"],age:15,co:"Les Incandescent.es"},
  mimorna:{th:["memoire","cultures","famille"],f:["seul"],age:12,co:"Kraken"},
  parade:{th:["repertoire","creation"],f:["danse","musique"],age:7},
- houle:{th:["reve"],f:["jeune","musique","comedie"],age:10,co:"Collectif FASP"}
+ houle:{th:["reve"],f:["jeune","musique","comedie"],age:10,co:"Collectif FASP"},
+ fanny:{th:["amour"],f:["seul","comedie"],age:16},
+ avaverden:{th:["identite","fete"],f:["seul","concert","musique"],age:0,co:"Big Up"}
 };
