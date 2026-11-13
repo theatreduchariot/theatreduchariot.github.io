@@ -34,7 +34,7 @@ const SHOWS=[
   credits:[["Musiciennes","Sarah Amiel et Laura Marteau"],["Technique","Flore"]],
   sessions:["10-24 19:00"]},
  {id:"comme",img:"https://static.wixstatic.com/media/79b2f8_dce7fba1730e4b0bbfdb62855244fc35~mv2.jpg",t:"C'est comme ça : spectacle pour changer le monde",by:"Yvan Loiseau",genre:"Seul en scène",age:"Dès 8 ans",dur:"1h15",s:"11-02",e:"12-01",p:"#c25b1b",url:"/spectacles/c'est-comme-ca",book:BILLET+"/s/6a553ff56356a96add36421c",
-  d:"Si vous pensez que c'est encore possible de faire quelque chose pour changer le monde, venez au Chariot, on va essayer ensemble !",
+  d:"C'est comme ça est un spectacle seul en scène qui parle du désir de changer le monde pour le rendre plus beau, plus juste. C'est la fatalité qu'on ne veut plus entendre : arrêter de réagir pour agir, rugir, être dans l'action. À travers des expériences interactives avec le public et mêlant son histoire intime, Yvan Loiseau essaye de questionner le commun avec humour et poésie. Qu'avons-nous à changer pour que le monde change ? Quelles sont les solutions réalistes pour que tout aille mieux ?",
   credits:[["Texte et interprétation","Yvan Loiseau"],["Mise en scène","Marc Cassar"],["Direction de jeu","Théodora Carla"],["Production","Cie Perdus dans la baignoire"]],
   sessions:["11-02 21:00","11-03 21:00","11-09 21:00","11-10 21:00","11-16 21:00","11-17 21:00","11-23 21:00","11-24 21:00","11-30 21:00","12-01 21:00"]},
  {id:"quatrieme",img:"https://static.wixstatic.com/media/79b2f8_ae411522381346d6a78373834cb321aa~mv2.jpg",t:"Quatrième étage",by:"Yann Pichot",genre:"Comédie dramatique",age:"Dès 12 ans",dur:"1h",s:"11-02",e:"11-24",p:"#3a4fa8",url:"/spectacles/quatri%C3%A8me-%C3%A9tage",book:BILLET+"/s/6abbb9f8c1755a0cf8b2fff2",
