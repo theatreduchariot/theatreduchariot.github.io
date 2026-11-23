@@ -285,7 +285,9 @@ const SHOWS=[
  {id:"fanny",arch:true,img:"https://static.wixstatic.com/media/79b2f8_33dbcd349732486cbed7a1f316a60d32~mv2.png",t:"Fanny contre les vampires",by:"Agathe Joliet, avec Fanny Spinetta",age:"Dès 16 ans",periode:"7 – 8 nov.",p:"#5a2a3a",url:"/spectacles/fanny-contre-les-vampires",
   d:"Seul en scène burlesque. Fanny a rencontré quelqu'un, il n'est vraiment pas comme les autres et pour cause : c'est un vampire."},
  {id:"avaverden",arch:true,img:"https://static.wixstatic.com/media/79b2f8_ff85ea0598604199861b243984f0414d~mv2.png",t:"Ava's Verden",by:"Ava Hervier, compagnie Big Up",age:"Tous publics",periode:"1er – 15 déc.",p:"#2f4a6b",url:"/spectacles/ava's-verden",
-  d:"Entre la chanson réaliste, la house-music et le 8 bit, Ava's Verden offre au public un univers original, déjanté et merveilleux, entre concert et performance. C'est sensuel, tragique et drôle."}
+  d:"Entre la chanson réaliste, la house-music et le 8 bit, Ava's Verden offre au public un univers original, déjanté et merveilleux, entre concert et performance. C'est sensuel, tragique et drôle."},
+ {id:"terre1",arch:true,t:"Terre salée",by:"Romane Bricard",age:"Dès 10 ans",periode:"16 – 19 oct.",p:"#4f3a6b",url:"/spectacles/terre-sal%C3%A9e",
+  d:"Depuis plusieurs nuits, Jeanne rêve d'une terre peuplée de femmes et de trous. Habitée par ce songe obsédant, elle se met en quête de réponses et redécouvre petit à petit son histoire familiale."}
 ];
 
 const PROFIL={
@@ -406,5 +408,6 @@ const PROFIL={
  parade:{th:["repertoire","creation"],f:["danse","musique"],age:7},
  houle:{th:["reve"],f:["jeune","musique","comedie"],age:10,co:"Collectif FASP"},
  fanny:{th:["amour"],f:["seul","comedie"],age:16},
- avaverden:{th:["identite","fete"],f:["seul","concert","musique"],age:0,co:"Big Up"}
+ avaverden:{th:["identite","fete"],f:["seul","concert","musique"],age:0,co:"Big Up"},
+ terre1:{th:["deuil","famille","parentalite","femmes","reve"],f:["seul","poesie","drame"],age:10}
 };
